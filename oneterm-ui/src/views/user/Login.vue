@@ -6,6 +6,7 @@
     <div class="ops-login-right">
       <img src="../../assets/logo_oneterm.png" />
       <a-form
+        v-if="localLoginEnabled"
         id="formLogin"
         ref="formLogin"
         :form="form"
@@ -70,6 +71,9 @@
           </a-checkbox>
         </a-form-item>
       </a-form>
+      <p v-if="policyLoaded && !localLoginEnabled && !_enable_list.length" role="alert">
+        {{ $t('cs.login.oidcUnavailable') }}
+      </p>
       <template v-if="_enable_list && _enable_list.length >= 1">
         <a-divider style="font-size:14px">
           {{ $t('cs.login.otherLoginWay') }}
@@ -91,6 +95,7 @@ import md5 from 'md5'
 import { mapState, mapActions } from 'vuex'
 import { timeFix } from '@/utils/util'
 import appConfig from '@/config/app.js'
+import { webLoginProviders } from '@/utils/webLoginPolicy'
 
 export default {
   name: 'Login',
@@ -114,6 +119,12 @@ export default {
     }
   },
   computed: {
+    policyLoaded() {
+      return typeof this.auth_enable.web_local_login_enabled === 'boolean'
+    },
+    localLoginEnabled() {
+      return this.auth_enable.web_local_login_enabled === true
+    },
     ...mapState({ auth_enable: (state) => state?.user?.auth_enable ?? {} }),
     enable_list() {
       return this.auth_enable?.enable_list ?? []
@@ -122,7 +133,7 @@ export default {
       return this.enable_list.some((en) => en.auth_type === 'LDAP')
     },
     _enable_list() {
-      return this.enable_list.filter((en) => en.auth_type !== 'LDAP')
+      return webLoginProviders(this.auth_enable)
     },
   },
   watch: {
@@ -135,7 +146,11 @@ export default {
   },
   created() {},
   async mounted() {
-    await this.GetAuthDataEnable()
+    try {
+      await this.GetAuthDataEnable()
+    } catch (error) {
+      this.$message.error(this.$t('cs.login.policyFailed'))
+    }
   },
   methods: {
     ...mapActions(['Login', 'GetAuthDataEnable']),
@@ -152,6 +167,10 @@ export default {
     },
     handleSubmit(e) {
       e.preventDefault()
+      if (!this.localLoginEnabled) {
+        this.$message.error(this.$t('cs.login.localLoginDisabled'))
+        return
+      }
       const {
         hasLDAP,
         form: { validateFields },

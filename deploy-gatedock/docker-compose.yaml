@@ -1,0 +1,177 @@
+name: ${GATEDOCK_PROJECT_NAME:-gatedock}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  api:
+    image: ${GATEDOCK_API_IMAGE:-gatedock-api:local}
+    build:
+      context: ../backend
+      dockerfile: dockerfile
+    environment:
+      ONETERM_RDP_DRIVE_PATH: /rdp
+    volumes:
+      - ./runtime/config.yaml:/oneterm/config.yaml:ro
+      - ./data/replay:/replay
+      - ./data/rdp:/rdp
+    depends_on:
+      acl-api:
+        condition: service_healthy
+      oneterm-guacd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+    logging: *logging
+    networks: [default]
+
+  web:
+    image: ${GATEDOCK_UI_IMAGE:-gatedock-ui:local}
+    build:
+      context: ../oneterm-ui
+    environment:
+      GATEDOCK_WEB_LOCAL_LOGIN_ENABLED: ${GATEDOCK_WEB_LOCAL_LOGIN_ENABLED:-true}
+      GATEDOCK_TRUSTED_PROXY_CIDR: ${GATEDOCK_TRUSTED_PROXY_CIDR:-127.0.0.1/32}
+      ONETERM_API_HOST: api:8888
+      ACL_API_HOST: acl-api:5000
+    volumes:
+      - ./nginx.conf.template:/etc/gatedock/nginx.conf.template:ro
+      - ./web-entrypoint.sh:/etc/gatedock/web-entrypoint.sh:ro
+      - ./web-login-policy.sh:/etc/gatedock/web-login-policy.sh:ro
+    entrypoint: ["/bin/sh", "/etc/gatedock/web-entrypoint.sh"]
+    ports:
+      - "${GATEDOCK_WEB_BIND:-127.0.0.1}:${GATEDOCK_WEB_PORT:-8666}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/gatedock/auth-policy"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+    logging: *logging
+    networks:
+      default:
+        ipv4_address: ${GATEDOCK_WEB_IP:-172.29.80.10}
+
+  mysql:
+    image: ${GATEDOCK_MYSQL_IMAGE:-mysql:8.4.7}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run ./gatedock.sh init first}
+      GATEDOCK_DB_PASSWORD: ${GATEDOCK_DB_PASSWORD:?Missing database password}
+      DB_ACL_PASSWORD: ${DB_ACL_PASSWORD:?Missing ACL database password}
+      GATEDOCK_ACL_APP_ID: ${GATEDOCK_ACL_APP_ID:?Missing ACL application ID}
+      GATEDOCK_ACL_APP_SECRET: ${GATEDOCK_ACL_APP_SECRET:?Missing ACL application secret}
+      GATEDOCK_ADMIN_PASSWORD_MD5: ${GATEDOCK_ADMIN_PASSWORD_MD5:?Missing admin password hash}
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./mysql-init.sh:/docker-entrypoint-initdb.d/10-gatedock.sh:ro
+      - ../deploy/acl.sql:/etc/gatedock/acl.sql:ro
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u root -e 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    restart: unless-stopped
+    logging: *logging
+    networks: [default]
+
+  redis:
+    image: ${GATEDOCK_REDIS_IMAGE:-redis:7.2.12-alpine}
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+    logging: *logging
+    networks: [default]
+
+  acl-api:
+    image: ${GATEDOCK_ACL_IMAGE:-gatedock-acl:local}
+    build:
+      context: ./acl
+      additional_contexts:
+        acl-source: ../third_party/gatedock-acl
+      args:
+        ACL_REVISION: ${GATEDOCK_ACL_REVISION:?Use ./gatedock.sh or set the pinned ACL revision}
+    environment: &acl-environment
+      SECRET_KEY: ${GATEDOCK_SESSION_SECRET:?Missing session secret}
+      DB_ACL_PASSWORD: ${DB_ACL_PASSWORD:?Missing ACL database password}
+      FLASK_APP: autoapp.py
+      FLASK_ENV: production
+      FLASK_DEBUG: "0"
+      SYSTEM_DEFAULT_LANGUAGE: zh-CN
+      GATEDOCK_ACL_WORKERS: ${GATEDOCK_ACL_WORKERS:-2}
+    volumes:
+      - ./acl-entrypoint.sh:/etc/gatedock/acl-entrypoint.sh:ro
+      - ../deploy/acl-schema.py:/data/apps/acl/acl-schema.py:ro
+      - ./data/acl-logs:/data/apps/acl/logs
+    entrypoint: ["/bin/sh", "/etc/gatedock/acl-entrypoint.sh"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/api/common-setting/v1/auth_config/enable_list"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    restart: unless-stopped
+    logging: *logging
+    networks: [default]
+
+  acl-worker:
+    image: ${GATEDOCK_ACL_IMAGE:-gatedock-acl:local}
+    environment: *acl-environment
+    working_dir: /data/apps/acl
+    entrypoint: ["celery", "-A", "celery_worker.celery", "worker", "-E", "-Q", "acl_async", "--autoscale=2,1"]
+    depends_on:
+      acl-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A celery_worker.celery inspect ping -d \"celery@$$HOSTNAME\" --timeout=5"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    logging: *logging
+    networks: [default]
+
+  oneterm-guacd:
+    image: ${GATEDOCK_GUACD_IMAGE:-ghcr.io/veops/oneterm-guacd:v26.10.1}
+    user: root
+    volumes:
+      - ./data/replay:/replay
+      - ./data/rdp:/rdp
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "4822"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+    logging: *logging
+    networks: [default]
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${GATEDOCK_NETWORK_SUBNET:-172.29.80.0/24}

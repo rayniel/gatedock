@@ -54,6 +54,17 @@
     </a-form-model-item>
 
     <a-form-model-item
+      v-if="hasTelnetProtocol"
+      :label="$t('oneterm.assetList.telnetBackspace')"
+      :extra="$t('oneterm.assetList.telnetBackspaceTip')"
+    >
+      <a-select v-model="form.telnet_backspace">
+        <a-select-option value="del">DEL (0x7f)</a-select-option>
+        <a-select-option value="bs">BS (0x08)</a-select-option>
+      </a-select>
+    </a-form-model-item>
+
+    <a-form-model-item
       prop="gateway_id"
       class="form-gateway"
     >
@@ -120,6 +131,7 @@ export default {
     return {
       form: {
         gateway_id: undefined,
+        telnet_backspace: 'del',
         web_config: _.cloneDeep(DEFAULT_WEB_CONFIG)
       },
       rules: {},
@@ -129,6 +141,9 @@ export default {
     }
   },
   computed: {
+    hasTelnetProtocol() {
+      return this.protocols.some(protocol => protocol.value === 'telnet')
+    },
     showAddProtocol() {
       return this.protocols?.length < 3 && !this.hasWebProtocol
     },
@@ -182,19 +197,22 @@ export default {
       return {
         gateway_id: gateway_id || undefined,
         web_config: cloneWebConfig,
+        telnet_backspace: this.hasTelnetProtocol ? this.form.telnet_backspace : undefined,
         protocols: _protocols
       }
     },
     setValues({
       gateway_id,
       protocols,
-      web_config
+      web_config,
+      telnet_backspace = 'del'
     }) {
       const cloneWebConfig = _.cloneDeep(web_config || DEFAULT_WEB_CONFIG)
       this.handleWebConfigData(cloneWebConfig)
 
       this.form = {
         gateway_id: gateway_id || undefined,
+        telnet_backspace: telnet_backspace || 'del',
         web_config: cloneWebConfig
       }
       this.protocols = protocols?.length

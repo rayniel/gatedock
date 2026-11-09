@@ -109,31 +109,24 @@ OneTerm 是一款简单、轻量、灵活的企业级堡垒机产品，基于4A�
 
 ## 开箱即用
 
-### 方式一：快速部署（默认密码）
-+ docker-compose 安装
+### GateDock 本地源码部署
++ 独立部署目录，不使用上游应用镜像：
   ```bash
-  git clone https://github.com/veops/oneterm.git
-  cd oneterm/deploy
-  docker compose up -d
+  git clone --recurse-submodules https://github.com/rayniel/gatedock.git
+  cd gatedock/deploy-gatedock
+  ./gatedock.sh init
+  ./gatedock.sh up
   ```
 
-### 方式二：安全部署（自定义密码）
-+ 生产环境建议使用安装脚本配置安全密码：
-  ```bash
-  git clone https://github.com/veops/oneterm.git
-  cd oneterm/deploy
-  ./setup.sh
-  docker compose up -d
-  ```
-  安装脚本将会：
-  - 生成安全的随机密码或允许你设置自定义密码
-  - 使用你的密码更新所有配置文件
-  - 为安全起见创建备份文件
+  初始化自动生成随机密钥及管理员密码，不覆盖现有配置或数据。
+  数据位于 `deploy-gatedock/data/`，默认不发布内部依赖端口和 SSH 入口。
+  APISIX、OIDC-only、升级备份及恢复见[GateDock 部署说明](deploy-gatedock/README.md)。
+  `deploy/` 保留上游兼容材料，不是 GateDock 生产部署入口；旧安装不要直接切换数据目录。
 
 + **访问**
   - 浏览器: [http://127.0.0.1:8666](http://127.0.0.1:8666)
   - 账号: admin
-  - 密码: 123456（默认）或使用setup.sh时设置的自定义密码
+  - 密码: 见本机 `deploy-gatedock/runtime/admin.credentials`
 
 ## 开发环境
 

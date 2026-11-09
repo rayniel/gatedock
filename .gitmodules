@@ -1,0 +1,3 @@
+[submodule "third_party/gatedock-acl"]
+	path = third_party/gatedock-acl
+	url = https://github.com/rayniel/gatedock-acl.git

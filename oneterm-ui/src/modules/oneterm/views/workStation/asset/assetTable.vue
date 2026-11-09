@@ -39,12 +39,19 @@
               v-for="item in row.accountList"
               :key="item.protocol + item.account_id"
               class="workstation-asset-table-account-item"
-              @click="openTerminal(row.id, row.name, item)"
             >
-              <ops-icon class="workstation-asset-table-account-protocol" :type="item.protocolIcon" />
-              <span class="workstation-asset-table-account-name">{{ item.account_name }}</span>
+              <button
+                type="button"
+                class="workstation-asset-table-account-action workstation-asset-table-account-connect"
+                :title="$t('oneterm.desktop.openInWorkstation')"
+                @click.stop="openTerminal(row.id, row.name, item)"
+              >
+                <ops-icon class="workstation-asset-table-account-protocol" :type="item.protocolIcon" />
+                <span class="workstation-asset-table-account-name">{{ item.account_name }}</span>
+              </button>
               <a-tooltip v-if="item.protocolType === 'rdp'" :title="$t('oneterm.desktop.openInTab')">
                 <a
+                  class="workstation-asset-table-account-action workstation-asset-table-account-desktop"
                   :href="desktopHref(row, item)"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -336,19 +343,32 @@ export default {
     }
 
     &-item {
-      padding: 0px 8px;
-      background-color: #ebeff8;
-      height: 30px;
       display: flex;
       align-items: center;
+      gap: 8px;
+    }
+
+    &-action {
+      padding: 0 8px;
+      background-color: #ebeff8;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border-radius: 2px;
       border: 1px solid transparent;
+      font: inherit;
       cursor: pointer;
 
-      &:hover {
+      &:hover,
+      &:focus-visible {
         border-color: #7f97fa;
         background-color: #e1efff;
       }
+    }
+
+    &-desktop {
+      min-width: 30px;
     }
   }
 

@@ -1,16 +1,18 @@
-FROM golang:alpine
+FROM golang:1.26.8-alpine AS builder
 WORKDIR /oneterm
+COPY go.mod go.sum ./
+COPY third_party ./third_party
+ARG GOPROXY=https://goproxy.cn,direct
+RUN go mod download
 COPY . .
-RUN go env -w GOPROXY=https://goproxy.cn,direct \
-    && go build --ldflags "-s -w" -o ./build/oneterm ./cmd/server/main.go
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /build/server ./cmd/server
 
-FROM alpine:latest
-RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
-RUN apk add tzdata
+FROM alpine:3.23
+RUN apk add --no-cache ca-certificates tzdata
 ENV TZ=Asia/Shanghai
 ENV TERM=xterm-256color
+ENV ONETERM_CONFIG_FILE=/oneterm/config.yaml
 WORKDIR /oneterm
-COPY --from=0 /oneterm/internal/i18n/locales ./locales
-COPY --from=0 /oneterm/build/oneterm .
-CMD [ "./oneterm","run","-c","./config.yaml"]
-
+COPY --from=builder /oneterm/internal/i18n/locales ./locales
+COPY --from=builder /build/server ./server
+CMD ["./server"]

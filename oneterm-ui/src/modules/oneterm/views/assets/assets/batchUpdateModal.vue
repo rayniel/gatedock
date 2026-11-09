@@ -85,9 +85,10 @@ export default {
           const { authorization } = this.$refs.account.getValues()
           params.authorization = authorization
         } else if (this.type === 'protocols') {
-          const { gateway_id, protocols } = this.$refs.protocol.getValues()
+          const { gateway_id, protocols, telnet_backspace } = this.$refs.protocol.getValues()
           params.gateway_id = gateway_id
           params.protocols = protocols
+          if (telnet_backspace !== undefined) params.telnet_backspace = telnet_backspace
         }
         await putAssetById(this.selectedRowKeys[i].id, params)
       }

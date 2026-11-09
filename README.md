@@ -102,31 +102,25 @@ Welcome to Star and follow us to get the latest updates!
 
 ## Quick Start
 
-### Method 1: Quick Deploy (Default Password)
-+ Docker Compose Installation
+### GateDock Local Source Deployment
++ Dedicated deployment directory, building our application images from source:
   ```bash
-  git clone https://github.com/veops/oneterm.git
-  cd oneterm/deploy
-  docker compose up -d
+  git clone --recurse-submodules https://github.com/rayniel/gatedock.git
+  cd gatedock/deploy-gatedock
+  ./gatedock.sh init
+  ./gatedock.sh up
   ```
 
-### Method 2: Secure Deploy (Custom Passwords)
-+ For production environments, use the setup script to configure secure passwords:
-  ```bash
-  git clone https://github.com/veops/oneterm.git
-  cd oneterm/deploy
-  ./setup.sh
-  docker compose up -d
-  ```
-  The setup script will:
-  - Generate secure random passwords or let you set custom ones
-  - Update all configuration files with your passwords
-  - Create backup files for safety
+  Initialization generates random credentials and refuses to overwrite existing data/configuration.
+  Data lives in `deploy-gatedock/data/`; internal dependencies and CLI SSH are not published by default.
+  See [GateDock deployment guide](deploy-gatedock/README.md) for APISIX, OIDC-only login, backups and recovery.
+  `deploy/` remains upstream-compatible material, not the GateDock production entry point.
+  Existing installations require a separately tested migration; do not reuse old database directories directly.
 
 + **Access**
   - Open your browser and visit: [http://127.0.0.1:8666](http://127.0.0.1:8666)
   - Username: admin
-  - Password: 123456 (default) or your custom password if using setup.sh
+  - Password: stored locally in `deploy-gatedock/runtime/admin.credentials`
 
 ## Development
 

@@ -369,6 +369,8 @@ const oneterm_en = {
   assetNoProtocol: 'No protocols configured for this asset',
   noAccountPermission: 'You do not have permission to access any accounts for this asset. Please contact your administrator.',
   assetList: {
+    telnetBackspace: 'Telnet Backspace',
+    telnetBackspaceTip: 'DEL (0x7f) preserves terminal input. Choose BS (0x08) for devices such as Huawei when Backspace does not work. Save and reconnect to apply.',
     grantUser: 'Granted User',
     assetTree: 'Asset Tree',
     createFolder: 'Create Folder',
@@ -493,7 +495,10 @@ const oneterm_en = {
     waiting: 'Waiting...',
     connected: 'Connected',
     disconnect: 'Connection closed',
-    clipboard: 'Clipboard'
+    clipboard: 'Clipboard',
+    clipboardUnavailable: 'Direct clipboard sync is unavailable. Use HTTPS (except localhost), allow browser clipboard access, or use the manual clipboard button.',
+    clipboardFailed: 'Clipboard sync failed. Check browser permissions or use the manual clipboard button.',
+    clipboardPermissionDenied: 'Clipboard access is not allowed for this session'
   },
   systemSettings: {
     accessControl: 'Access Control',
@@ -530,6 +535,9 @@ const oneterm_en = {
     selectedCommand: 'Selected',
   },
   accessControl: {
+    personalPreferences: 'Personal clipboard preferences',
+    directClipboard: 'Direct clipboard sync',
+    directClipboardTip: 'Personal preference, off by default. Use Ctrl+V / Cmd+V in the remote desktop to paste local text directly; remote copied text syncs to your local clipboard. Copy/paste permissions still apply. Bidirectional sync requires HTTPS (except localhost) and browser clipboard permission. Save and reconnect to apply.',
     timeout: 'Maximum session free time',
     copyTip: 'The local device can get the contents of the clipboard text in the remote desktop in real time.',
     pasteTip: 'Remote Desktop can get the content of the text currently copied by the local device via the clipboard.',

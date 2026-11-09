@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+config.yaml
+config.*.yaml
+build
+server
+oneterm
+*.log
+logs

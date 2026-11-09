@@ -39,7 +39,7 @@ const (
 )
 
 // ConnectTelnet establishes a connection to a Telnet server and handles the session
-// It performs authentication, sets up the environment, and manages data flow
+// It performs authentication and manages data flow
 // between the client and server until the session ends.
 func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
@@ -77,7 +77,6 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 	var promptMutex sync.Mutex
 	loginSent := false
 	passwordSent := false
-	terminalTypeSent := false
 
 	// Authentication handler goroutine
 	// Monitors server responses for login/password prompts and responds accordingly
@@ -178,11 +177,6 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 							strings.Contains(promptStr, "#") ||
 							strings.Contains(promptStr, ">") {
 
-							if !terminalTypeSent {
-								setTerminalType(conn)
-								terminalTypeSent = true
-							}
-
 							authDone <- true
 							return
 						}
@@ -195,13 +189,11 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 	// Wait for authentication to complete or timeout
 	select {
 	case <-authDone:
-		setupEnvironment(conn)
 	case err := <-authErr:
 		logger.L().Error("telnet authentication failed", zap.Error(err))
 		return err
 	case <-time.After(10 * time.Second):
-		// Fallback: proceed even if authentication times out
-		setupEnvironment(conn)
+		// Allow interactive login if automatic prompt detection times out.
 	}
 
 	// Data flow from client to server
@@ -228,7 +220,7 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 				}
 
 				if n > 0 {
-					_, err = conn.Write(buf[:n])
+					_, err = conn.Write(normalizeTelnetInput(buf[:n], asset.TelnetBackspace))
 					if err != nil {
 						logger.L().Info("write to telnet failed, connection likely closed", zap.Error(err))
 						return err
@@ -295,45 +287,17 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 	return nil
 }
 
-// setTerminalType configures the terminal type and dimensions
-// This helps ensure proper display of text and ANSI sequences
-func setTerminalType(conn net.Conn) {
-	_, err := conn.Write([]byte("export TERM=xterm-256color\r\n"))
-	if err != nil {
-		logger.L().Error("failed to set TERM environment variable", zap.Error(err))
+func normalizeTelnetInput(data []byte, mode string) []byte {
+	// Only translate Backspace when the asset explicitly requests BS.
+	if mode != "bs" {
+		return data
 	}
-
-	_, err = conn.Write([]byte("export LINES=24 COLUMNS=80\r\n"))
-	if err != nil {
-		logger.L().Error("failed to set terminal dimensions", zap.Error(err))
+	for i, b := range data {
+		if b == 0x7f {
+			data[i] = 0x08
+		}
 	}
-
-	_, err = conn.Write([]byte("stty rows 24 columns 80\r\n"))
-	if err != nil {
-		logger.L().Error("failed to set stty configuration", zap.Error(err))
-	}
-}
-
-// setupEnvironment configures the shell environment for optimal telnet operation
-// Disables features that could interfere with terminal display or functionality
-func setupEnvironment(conn net.Conn) {
-	time.Sleep(500 * time.Millisecond)
-	setTerminalType(conn)
-
-	_, err := conn.Write([]byte("set +o histappend 2>/dev/null || true\r\n"))
-	if err != nil {
-		logger.L().Error("failed to configure shell history", zap.Error(err))
-	}
-
-	_, err = conn.Write([]byte("unalias -a 2>/dev/null || true\r\n"))
-	if err != nil {
-		logger.L().Error("failed to unalias commands", zap.Error(err))
-	}
-
-	_, err = conn.Write([]byte("clear 2>/dev/null || echo -e '\\033c'\r\n"))
-	if err != nil {
-		logger.L().Error("failed to clear screen", zap.Error(err))
-	}
+	return data
 }
 
 // processTelnetData handles telnet protocol control sequences

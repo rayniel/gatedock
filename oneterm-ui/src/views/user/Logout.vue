@@ -22,6 +22,7 @@
 
 <script>
 import { mapState, mapActions } from 'vuex'
+import { webLoginProviders } from '@/utils/webLoginPolicy'
 export default {
   name: 'Logout',
   data() {
@@ -37,7 +38,7 @@ export default {
       return this.auth_enable.enable_list ?? []
     },
     _enable_list() {
-      return this.enable_list.filter((en) => en.auth_type !== 'LDAP')
+      return webLoginProviders(this.auth_enable)
     },
     auth_auto_redirect() {
       return this.auth_enable.auth_auto_redirect ?? 0
@@ -61,7 +62,14 @@ export default {
   },
   async mounted() {
     this.loading = true
-    await this.GetAuthDataEnable()
+    try {
+      await this.GetAuthDataEnable()
+    } catch (error) {
+      this.loading = false
+      this.$message.error(this.$t('cs.login.policyFailed'))
+      this.$router.push({ path: '/user/login', query: this.$route.query })
+      return
+    }
     this.loading = false
     if (!this._enable_list.length || this._enable_list.length > 1) {
       let loginURL = '/user/login'
@@ -71,6 +79,7 @@ export default {
       }
 
       this.$router.push(loginURL)
+      return
     }
     if (this.auth_auto_redirect) {
       this.time = 0

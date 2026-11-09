@@ -114,6 +114,11 @@ import { isFontAvailable } from '@/modules/oneterm/utils/index.js'
 
 import ResolutionSetting from './resolutionSetting/index.vue'
 
+const defaultDisplaySetting = {
+  ..._.omit(defaultPreferenceSetting, ['theme', 'settings']),
+  settings: { resolution: defaultPreferenceSetting.settings.resolution }
+}
+
 const allFontFamily = [
   // Windows
   'Consolas', 'Courier New', 'Lucida Console', 'MS Gothic', 'NSimSun', 'SimSun-ExtB', 'Cascadia Mono', 'Cascadia Code',
@@ -132,7 +137,7 @@ export default {
   },
   data() {
     return {
-      form: _.omit(defaultPreferenceSetting, 'theme'),
+      form: _.cloneDeep(defaultDisplaySetting),
       rules: {
         font_family: [{ required: true, message: this.$t('placeholder2') }],
         font_size: [{ required: true, message: this.$t('placeholder2') }],
@@ -170,6 +175,7 @@ export default {
       Object.keys(this.form).map((key) => {
         form[key] = data?.[key] || this.form[key]
       })
+      form.settings = { resolution: data.settings?.resolution || defaultDisplaySetting.settings.resolution }
       this.form = form
     },
 
@@ -177,7 +183,8 @@ export default {
       this.$refs.displaySettingForm.validate(async (valid) => {
         if (valid) {
           const params = {
-            ...this.form
+            ...this.form,
+            settings: { resolution: this.form.settings.resolution }
           }
           await putPreference(params)
 
@@ -189,7 +196,7 @@ export default {
     },
 
     resetForm() {
-      this.form = _.omit(defaultPreferenceSetting, 'theme')
+      this.form = _.cloneDeep(defaultDisplaySetting)
     }
   },
 }

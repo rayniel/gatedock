@@ -1,0 +1,14 @@
+services:
+  oneterm-ui:
+    image: gatedock-ui:local
+    build:
+      context: ../oneterm-ui
+    environment:
+      GATEDOCK_WEB_LOCAL_LOGIN_ENABLED: ${GATEDOCK_WEB_LOCAL_LOGIN_ENABLED:-true}
+      GATEDOCK_TRUSTED_PROXY_CIDR: ${GATEDOCK_TRUSTED_PROXY_CIDR:-127.0.0.1/32}
+    volumes:
+      - ../deploy-gatedock/nginx.conf.template:/etc/gatedock/nginx.conf.template:ro
+      - ../deploy-gatedock/web-entrypoint.sh:/etc/gatedock/web-entrypoint.sh:ro
+      - ../deploy-gatedock/web-login-policy.sh:/etc/gatedock/web-login-policy.sh:ro
+    entrypoint: ["/bin/sh", "/etc/gatedock/web-entrypoint.sh"]
+    command: []

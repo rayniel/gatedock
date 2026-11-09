@@ -1,6 +1,7 @@
 <template>
   <div class="access-control system-settings-panel">
     <a-form-model
+      v-if="isAdmin"
       ref="configForm"
       class="system-settings-form"
       :model="form"
@@ -36,11 +37,37 @@
         </a-space>
       </a-form-model-item>
     </a-form-model>
+
+    <a-divider orientation="left">{{ $t('oneterm.accessControl.personalPreferences') }}</a-divider>
+    <a-form-model
+      class="system-settings-form access-control-preference"
+      :label-col="{ xs: { span: 24 }, sm: { span: 7 } }"
+      :wrapper-col="{ xs: { span: 24 }, sm: { span: 14 } }"
+    >
+      <a-form-model-item
+        :label="$t('oneterm.accessControl.directClipboard')"
+        :extra="$t('oneterm.accessControl.directClipboardTip')"
+      >
+        <a-switch v-model="directClipboard" :disabled="!preferenceReady || preferenceLoading" />
+      </a-form-model-item>
+      <a-form-model-item label=" " :colon="false">
+        <a-space>
+          <a-button :loading="preferenceLoading" @click="getClipboardPreference">{{ $t('reset') }}</a-button>
+          <a-button
+            type="primary"
+            :loading="preferenceLoading"
+            :disabled="!preferenceReady"
+            @click="saveClipboardPreference"
+          >{{ $t('save') }}</a-button>
+        </a-space>
+      </a-form-model-item>
+    </a-form-model>
   </div>
 </template>
 
 <script>
 import { getConfig, postConfig } from '@/modules/oneterm/api/config'
+import { getPreference, putPreference } from '@/modules/oneterm/api/preference'
 import { PERMISSION_TYPE } from './constants.js'
 
 import PermissionCheckbox from './permissionCheckbox.vue'
@@ -55,9 +82,18 @@ export default {
   components: {
     PermissionCheckbox
   },
+  props: {
+    isAdmin: {
+      type: Boolean,
+      default: false
+    }
+  },
   data() {
     return {
       loading: false,
+      directClipboard: false,
+      preferenceLoading: false,
+      preferenceReady: false,
       rules: {},
       form: {
         timeout: 5,
@@ -66,9 +102,30 @@ export default {
     }
   },
   mounted() {
-    this.getConfig()
+    if (this.isAdmin) this.getConfig()
+    this.getClipboardPreference()
   },
   methods: {
+    async getClipboardPreference() {
+      this.preferenceLoading = true
+      this.preferenceReady = false
+      try {
+        const response = await getPreference()
+        this.directClipboard = response?.data?.settings?.directClipboard === true
+        this.preferenceReady = true
+      } finally {
+        this.preferenceLoading = false
+      }
+    },
+    async saveClipboardPreference() {
+      this.preferenceLoading = true
+      try {
+        await putPreference({ settings: { directClipboard: this.directClipboard } })
+        this.$message.success(this.$t('saveSuccess'))
+      } finally {
+        this.preferenceLoading = false
+      }
+    },
     getConfig() {
       getConfig({
         info: true

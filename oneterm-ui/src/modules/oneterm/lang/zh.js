@@ -368,6 +368,8 @@ const oneterm_zh = {
   assetNoProtocol: '该资产未配置任何协议',
   noAccountPermission: '您没有该资产的任何账号权限，请联系管理员授权',
   assetList: {
+    telnetBackspace: 'Telnet 退格键',
+    telnetBackspaceTip: 'DEL (0x7f) 保持终端原始输入；华为等设备退格无效时可选择 BS (0x08)。保存后重新连接生效。',
     grantUser: '授权用户',
     assetTree: '资产树',
     createFolder: '新建目录',
@@ -492,7 +494,10 @@ const oneterm_zh = {
     waiting: '正在等待服务器响应...',
     connected: '连接成功',
     disconnect: '连接已关闭',
-    clipboard: '剪贴板'
+    clipboard: '剪贴板',
+    clipboardUnavailable: '无法直接同步剪贴板。请使用 HTTPS（localhost 除外）、允许浏览器剪贴板权限，或使用手动剪贴板按钮。',
+    clipboardFailed: '剪贴板同步失败，请检查浏览器权限或使用手动剪贴板按钮。',
+    clipboardPermissionDenied: '没有此会话的剪贴板权限'
   },
   systemSettings: {
     accessControl: '访问控制',
@@ -529,6 +534,9 @@ const oneterm_zh = {
     selectedCommand: '已选命令',
   },
   accessControl: {
+    personalPreferences: '个人剪贴板偏好',
+    directClipboard: '直接剪贴板同步',
+    directClipboardTip: '个人偏好，默认关闭。开启后在远程桌面按 Ctrl+V / Cmd+V 直接粘贴本地文本，远端复制的文本同步至本地。仍受复制/粘贴权限限制；双向同步需要 HTTPS（localhost 除外）和浏览器剪贴板授权。保存后重新打开连接生效。',
     timeout: '会话最大空闲时间',
     copyTip: '本地设备可以实时获取远程桌面中的剪贴板文本内容。',
     pasteTip: '远程桌面可以通过剪贴板获取本地设备当前复制的文本内容。',

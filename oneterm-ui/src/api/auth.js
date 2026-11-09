@@ -30,6 +30,13 @@ export function getAuthDataEnable() {
     })
 }
 
+export function getWebLoginPolicy() {
+    return axios({
+        url: '/gatedock/auth-policy',
+        method: 'get',
+    })
+}
+
 export function testLDAP(data) {
     return axios({
         url: `/common-setting/v1/auth_config/LDAP/test`,

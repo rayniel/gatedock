@@ -2,6 +2,9 @@
   "name": "oneops",
   "version": "0.0.9",
   "private": true,
+  "resolutions": {
+    "@achrinza/node-ipc": "9.2.10"
+  },
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",

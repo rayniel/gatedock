@@ -368,6 +368,8 @@ const oneterm_zh = {
   assetNoProtocol: '該資產未配置任何協議',
   noAccountPermission: '您沒有該資產的任何賬號權限，請聯繫管理員授權',
   assetList: {
+    telnetBackspace: 'Telnet 退格鍵',
+    telnetBackspaceTip: 'DEL (0x7f) 保持終端原始輸入；華為等設備退格無效時可選擇 BS (0x08)。儲存後重新連線生效。',
     grantUser: '授權用戶',
     assetTree: '資產樹',
     createFolder: '新建目錄',
@@ -492,7 +494,10 @@ const oneterm_zh = {
     waiting: '正在等待服務器響應...',
     connected: '連接成功',
     disconnect: '連接已關閉',
-    clipboard: '剪貼板'
+    clipboard: '剪貼板',
+    clipboardUnavailable: '無法直接同步剪貼板。請使用 HTTPS（localhost 除外）、允許瀏覽器剪貼板權限，或使用手動剪貼板按鈕。',
+    clipboardFailed: '剪貼板同步失敗，請檢查瀏覽器權限或使用手動剪貼板按鈕。',
+    clipboardPermissionDenied: '沒有此會話的剪貼板權限'
   },
   systemSettings: {
     accessControl: '訪問控制',
@@ -529,6 +534,9 @@ const oneterm_zh = {
     selectedCommand: '已選命令',
   },
   accessControl: {
+    personalPreferences: '個人剪貼板偏好',
+    directClipboard: '直接剪貼板同步',
+    directClipboardTip: '個人偏好，預設關閉。開啟後在遠端桌面按 Ctrl+V / Cmd+V 直接貼上本機文字，遠端複製的文字同步至本機。仍受複製/貼上權限限制；雙向同步需要 HTTPS（localhost 除外）和瀏覽器剪貼板授權。儲存後重新開啟連線生效。',
     timeout: '會話最大空閒時間',
     copyTip: '本地設備可以實時獲取遠程桌面中的剪貼板文本內容。',
     pasteTip: '遠程桌面可以通過剪貼板獲取本地設備當前複製的文本內容。',

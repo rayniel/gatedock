@@ -7,6 +7,7 @@
     <div
       ref="onetermGuacamoleRef"
       class="oneterm-guacamole-wrap"
+      @paste.capture="handleDirectPaste"
     ></div>
 
     <ClipboardModal
@@ -45,6 +46,7 @@ const STATE_WAITING = 2
 const STATE_CONNECTED = 3
 const STATE_DISCONNECTING = 4
 const STATE_DISCONNECTED = 5
+const META_KEYS = [65511, 65512, 65515, 65516]
 
 export default {
   name: 'GuacamoleClient',
@@ -92,9 +94,15 @@ export default {
       resizeHandler: null,
       requestedSize: null,
       sessionId: '',
+      clipboardWarningShown: false,
+      disposed: false,
+      keyboard: null,
     }
   },
   computed: {
+    directClipboard() {
+      return this.preferenceSetting?.settings?.directClipboard === true && !this.$route?.query?.is_monitor
+    },
     resolution() {
       const resolution = this?.preferenceSetting?.settings?.resolution || 'auto'
       return resolution === 'auto' ? 'auto' : resolution.split('x')
@@ -114,6 +122,7 @@ export default {
     }
   },
   beforeDestroy() {
+    this.disposed = true
     this.$message.destroy(this.messageKey)
 
     if (this.resizeObserver) {
@@ -201,14 +210,26 @@ export default {
       sink.focus()
 
       const keyboard = new Guacamole.Keyboard(sink.getElement())
+      this.keyboard = keyboard
 
       keyboard.onkeydown = (keysym) => {
+        // Use Command as Control for remote desktop shortcuts on macOS.
+        if (this.directClipboard && META_KEYS.includes(keysym)) {
+          client.sendKeyEvent(1, 65507)
+          return true
+        }
+        // Let the browser supply paste text before forwarding the remote shortcut.
+        if (this.isBrowserPasteKey(keysym, keyboard.pressed)) return true
         client.sendKeyEvent(1, keysym)
         if (keysym === 65288) {
           return false
         }
       }
       keyboard.onkeyup = (keysym) => {
+        if (this.directClipboard && META_KEYS.includes(keysym)) {
+          client.sendKeyEvent(0, 65507)
+          return
+        }
         client.sendKeyEvent(0, keysym)
       }
 
@@ -348,6 +369,7 @@ export default {
     },
 
     handleClipboardReceived(stream, mimetype) {
+      if (!this.assetPermissions?.[PERMISSION_TYPE.COPY] || this.$route?.query?.is_monitor) return
       if (/^text\//.exec(mimetype)) {
         const stringReader = new Guacamole.StringReader(stream)
         let str = ''
@@ -356,15 +378,27 @@ export default {
         }
 
         stringReader.onend = () => {
-          if (str) {
-            this.$copyText(str)
+          if (this.disposed || !this.assetPermissions?.[PERMISSION_TYPE.COPY]) return
+          if (this.directClipboard) {
+            if (!this.$refs.onetermGuacamoleRef.contains(document.activeElement) || !document.hasFocus()) return
+            if (!window.isSecureContext || !navigator.clipboard?.writeText) {
+              this.warnClipboard('clipboardUnavailable')
+              return
+            }
+            navigator.clipboard.writeText(str).catch(() => this.warnClipboard('clipboardFailed'))
+          } else if (str) {
+            this.$copyText(str).catch(() => this.warnClipboard('clipboardFailed'))
           }
         }
       }
     },
 
     handleClipboardOk(content) {
-      if (content?.length) {
+      if (!this.assetPermissions?.[PERMISSION_TYPE.PASTE] || this.$route?.query?.is_monitor) {
+        this.$message.warning(this.$t('oneterm.guacamole.clipboardPermissionDenied'))
+        return
+      }
+      if (this.client && this.clientState === STATE_CONNECTED && typeof content === 'string') {
         const stream = this.client.createClipboardStream('text/plain')
         const writer = new Guacamole.StringWriter(stream)
 
@@ -373,7 +407,47 @@ export default {
         }
 
         writer.sendEnd()
+        return true
       }
+    },
+
+    handleDirectPaste(event) {
+      if (!this.directClipboard || this.clientState !== STATE_CONNECTED) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (!this.assetPermissions?.[PERMISSION_TYPE.PASTE]) {
+        this.$message.warning(this.$t('oneterm.guacamole.clipboardPermissionDenied'))
+        return
+      }
+      if (!event.clipboardData || !Array.from(event.clipboardData.types).includes('text/plain')) {
+        this.warnClipboard('clipboardFailed')
+        return
+      }
+      if (this.handleClipboardOk(event.clipboardData.getData('text/plain'))) {
+        // Clipboard instructions and the shortcut share the same ordered tunnel.
+        const pressed = this.keyboard?.pressed || {}
+        const control = pressed[65507] || pressed[65508] ||
+          META_KEYS.some(key => pressed[key])
+        const shift = pressed[65505] || pressed[65506]
+        const key = shift && !control ? 65379 : 118
+        if (!control && !shift) this.client.sendKeyEvent(1, 65507)
+        this.client.sendKeyEvent(1, key)
+        this.client.sendKeyEvent(0, key)
+        if (!control && !shift) this.client.sendKeyEvent(0, 65507)
+      }
+    },
+
+    isBrowserPasteKey(keysym, pressed) {
+      if (!this.directClipboard) return false
+      const modifier = pressed[65507] || pressed[65508] || META_KEYS.some(key => pressed[key])
+      return ((keysym === 118 || keysym === 86) && Boolean(modifier)) ||
+        (keysym === 65379 && Boolean(pressed[65505] || pressed[65506]))
+    },
+
+    warnClipboard(key) {
+      if (this.disposed || this.clipboardWarningShown) return
+      this.clipboardWarningShown = true
+      this.$message.warning(this.$t(`oneterm.guacamole.${key}`))
     },
 
     handleResolutionOk() {
@@ -381,6 +455,10 @@ export default {
     },
 
     openClipboardModal() {
+      if (!this.assetPermissions?.[PERMISSION_TYPE.PASTE] || this.$route?.query?.is_monitor) {
+        this.$message.warning(this.$t('oneterm.guacamole.clipboardPermissionDenied'))
+        return
+      }
       this.$refs.clipboardModalRef.open()
     },
 

@@ -1,0 +1,6 @@
+--- a/api/views/acl/login.py
++++ b/api/views/acl/login.py
+@@ -199 +199,3 @@
++        session.clear()
++
+         self.jsonify(code=200)

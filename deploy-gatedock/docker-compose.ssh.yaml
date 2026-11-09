@@ -1,0 +1,4 @@
+services:
+  api:
+    ports:
+      - "${GATEDOCK_SSH_BIND:-127.0.0.1}:${GATEDOCK_SSH_PORT:-2222}:2222"

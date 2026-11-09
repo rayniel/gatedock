@@ -32,9 +32,11 @@ export default {
 
       if (navigator.clipboard) {
         navigator.clipboard.readText().then((text) => {
-          if (text) {
+          if (this.visible && text) {
             this.clipboardContent = text
           }
+        }).catch(() => {
+          this.$message.warning(this.$t('oneterm.guacamole.clipboardFailed'))
         })
       }
     },

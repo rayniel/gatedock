@@ -446,6 +446,9 @@ const cs_en = {
     selectApp: 'Select App',
   },
   login: {
+    policyFailed: 'Unable to load the Web login policy. Contact your administrator to check the service configuration.',
+    oidcUnavailable: 'Web password login is disabled, but OIDC is not enabled. Contact your administrator to check deployment and OIDC configuration.',
+    localLoginDisabled: 'Web password login is disabled. Use OIDC.',
     loginText: 'OneOps making operations simple',
     username: 'Username/Email',
     usernameRequired: 'Please input Username/Email',

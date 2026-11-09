@@ -6,7 +6,7 @@
           <ops-icon :type="item.icon" />
           <span>{{ $t(item.label) }}</span>
         </div>
-        <components :is="item.component" />
+        <components :is="item.component" v-bind="item.key === 'accessControl' ? { isAdmin } : {}" />
       </a-tab-pane>
     </a-tabs>
   </div>
@@ -65,17 +65,17 @@ export default {
           icon: 'terminal_settings',
           key: 'terminalDisplay',
           component: 'TerminalDisplay'
+        },
+        {
+          label: 'oneterm.systemSettings.accessControl',
+          icon: 'basic_settings',
+          key: 'accessControl',
+          component: 'AccessControl',
         }
       ]
 
       if (this.isAdmin) {
         menuList.push(
-          {
-            label: 'oneterm.systemSettings.accessControl',
-            icon: 'basic_settings',
-            key: 'accessControl',
-            component: 'AccessControl',
-          },
           {
             label: 'oneterm.systemSettings.storageConfig',
             icon: 'itsm-default_line',

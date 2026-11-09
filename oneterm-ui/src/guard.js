@@ -7,6 +7,8 @@ import 'nprogress/nprogress.css'
 import { setDocumentTitle, domTitle } from '@/utils/domUtil'
 import { ACCESS_TOKEN } from './store/global/mutation-types'
 import i18n from '@/lang'
+import { webLoginProviders } from '@/utils/webLoginPolicy'
+import { message } from 'ant-design-vue'
 
 NProgress.configure({ showSpinner: false })
 
@@ -35,7 +37,9 @@ router.beforeEach(async (to, from, next) => {
   ) {
     next()
   } else if ((auth_type || (!auth_type && Vue.ls.get(ACCESS_TOKEN))) && store.getters.roles.length === 0) {
-    store.dispatch('GetAuthDataEnable')
+    store.dispatch('GetAuthDataEnable').catch(() => {
+      message.error(i18n.t('cs.login.policyFailed'))
+    })
     store.dispatch('GetInfo').then(res => {
       const roles = res.result && res.result.role
       store.dispatch('loadAllUsers')
@@ -58,9 +62,14 @@ router.beforeEach(async (to, from, next) => {
   } else if (to.path === '/user/login' && !auth_type && store.getters.roles.length !== 0) {
     next({ path: '/' })
   } else if (!auth_type && !Vue.ls.get(ACCESS_TOKEN) && to.path !== '/user/login') {
-    await store.dispatch('GetAuthDataEnable')
-    const { enable_list = [] } = store?.state?.user?.auth_enable ?? {}
-    const _enable_list = enable_list.filter(en => en.auth_type !== 'LDAP')
+    try {
+      await store.dispatch('GetAuthDataEnable')
+    } catch (error) {
+      message.error(i18n.t('cs.login.policyFailed'))
+      next({ path: '/user/login', query: { redirect: to.fullPath } })
+      return
+    }
+    const _enable_list = webLoginProviders(store?.state?.user?.auth_enable)
     if (_enable_list.length === 1) {
       next({ path: '/user/logout', query: { redirect: to.fullPath } })
     } else {

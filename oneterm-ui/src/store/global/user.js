@@ -7,7 +7,7 @@ import { getAllUsers } from '../../api/login'
 import { searchPermResourceByRoleId } from '@/modules/acl/api/permission'
 import { getEmployeeByUid, getEmployeeList } from '@/api/employee'
 import { getAllDepartmentList } from '@/api/company'
-import { getAuthDataEnable } from '@/api/auth'
+import { getAuthDataEnable, getWebLoginPolicy } from '@/api/auth'
 
 const user = {
   state: {
@@ -143,20 +143,20 @@ const user = {
 
   actions: {
     // 获取enable_list
-    GetAuthDataEnable({ commit }, userInfo) {
-      return new Promise((resolve, reject) => {
-        getAuthDataEnable()
-          .then((res) => {
-            commit('SET_AUTH_ENABLE', res)
-            resolve()
-          })
-          .catch((error) => {
-            reject(error)
-          })
-      })
+    async GetAuthDataEnable({ commit }) {
+      commit('SET_AUTH_ENABLE', {})
+      const [res, policy] = await Promise.all([getAuthDataEnable(), getWebLoginPolicy()])
+      if (typeof policy?.web_local_login_enabled !== 'boolean') {
+        throw new Error('Invalid Web login policy')
+      }
+      commit('SET_AUTH_ENABLE', { ...res, web_local_login_enabled: policy.web_local_login_enabled })
     },
     // 登录
     Login({ commit }, { userInfo, auth_type = undefined }) {
+      if (auth_type) {
+        login(userInfo, auth_type)
+        return Promise.resolve()
+      }
       return new Promise((resolve, reject) => {
         login(userInfo, auth_type)
           .then((response) => {

@@ -1,0 +1,6 @@
+.env
+runtime/
+data/
+backups/
+*.log
+!acl/settings.py

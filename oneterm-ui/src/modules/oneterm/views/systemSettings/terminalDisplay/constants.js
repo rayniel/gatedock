@@ -6,6 +6,7 @@ export const defaultPreferenceSetting = {
   cursor_style: 'block',
   theme: '',
   settings: {
-    resolution: 'auto'
+    resolution: 'auto',
+    directClipboard: false
   }
 }

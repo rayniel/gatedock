@@ -151,6 +151,7 @@ export default {
           gateway_id = undefined,
           protocols = [],
           web_config,
+          telnet_backspace,
           authorization = {},
           access_time_control = {},
           asset_command_control = {}
@@ -162,7 +163,7 @@ export default {
           comment,
           parent_id: parent_id || undefined,
         }
-        this.$refs.protocol.setValues({ gateway_id, protocols, web_config })
+        this.$refs.protocol.setValues({ gateway_id, protocols, web_config, telnet_backspace })
         this.$refs.account.setValues({ authorization })
         this.$refs.accessAuth.setValues({
           access_time_control,
@@ -194,7 +195,7 @@ export default {
       this.$refs.baseForm.validate((valid) => {
         if (valid) {
           const { name, ip, parent_id, comment } = this.baseForm
-          const { gateway_id, protocols, web_config } = this.$refs.protocol.getValues()
+          const { gateway_id, protocols, web_config, telnet_backspace } = this.$refs.protocol.getValues()
           const { authorization } = this.$refs.account.getValues()
           const { cmd_ids, template_ids, time_ranges, timezone } = this.$refs.accessAuth.getValues()
           const params = {
@@ -204,6 +205,7 @@ export default {
             parent_id: parent_id ?? 0,
             protocols,
             web_config,
+            telnet_backspace,
             gateway_id: gateway_id ?? 0,
             authorization,
             access_time_control: {

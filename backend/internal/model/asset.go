@@ -120,19 +120,20 @@ func (am AuthorizationMap) MarshalJSON() ([]byte, error) {
 }
 
 type Asset struct {
-	Id            int              `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	Name          string           `json:"name" gorm:"column:name;uniqueIndex:name_del;size:128"`
-	Comment       string           `json:"comment" gorm:"column:comment"`
-	ParentId      int              `json:"parent_id" gorm:"column:parent_id"`
-	Ip            string           `json:"ip" gorm:"column:ip"`
-	Protocols     Slice[string]    `json:"protocols" gorm:"column:protocols;type:text"`
-	CIId          int              `json:"ci_id" gorm:"column:ci_id;index"`
-	CITypeId      int              `json:"ci_type_id" gorm:"column:ci_type_id"`
-	GatewayId     int              `json:"gateway_id" gorm:"column:gateway_id"`
-	Authorization AuthorizationMap `json:"authorization" gorm:"column:authorization;type:text"`
-	AccessAuth    AccessAuth       `json:"access_auth" gorm:"embedded;column:access_auth"` // Deprecated: Use V2 fields below
-	Connectable   bool             `json:"connectable" gorm:"column:connectable"`
-	NodeChain     string           `json:"node_chain" gorm:"-"`
+	Id              int              `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	Name            string           `json:"name" gorm:"column:name;uniqueIndex:name_del;size:128"`
+	Comment         string           `json:"comment" gorm:"column:comment"`
+	ParentId        int              `json:"parent_id" gorm:"column:parent_id"`
+	Ip              string           `json:"ip" gorm:"column:ip"`
+	Protocols       Slice[string]    `json:"protocols" gorm:"column:protocols;type:text"`
+	TelnetBackspace string           `json:"telnet_backspace" binding:"omitempty,oneof=bs del" gorm:"column:telnet_backspace;size:3;default:del"`
+	CIId            int              `json:"ci_id" gorm:"column:ci_id;index"`
+	CITypeId        int              `json:"ci_type_id" gorm:"column:ci_type_id"`
+	GatewayId       int              `json:"gateway_id" gorm:"column:gateway_id"`
+	Authorization   AuthorizationMap `json:"authorization" gorm:"column:authorization;type:text"`
+	AccessAuth      AccessAuth       `json:"access_auth" gorm:"embedded;column:access_auth"` // Deprecated: Use V2 fields below
+	Connectable     bool             `json:"connectable" gorm:"column:connectable"`
+	NodeChain       string           `json:"node_chain" gorm:"-"`
 
 	// V2 Access Control (replaces AccessAuth)
 	AccessTimeControl   *AccessTimeControl   `json:"access_time_control,omitempty" gorm:"column:access_time_control;type:json"`

@@ -370,7 +370,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 				} else {
 					// Normal auth: All asset fields
 					allowedFields = []string{"name", "ip", "gateway_id", "protocols", "authorization", "parent_id",
-						"comment", "connectable", "access_time_control", "asset_command_control", "web_config", "ci_id", "ci_type_id"}
+						"comment", "connectable", "access_time_control", "asset_command_control", "web_config", "ci_id", "ci_type_id", "telnet_backspace"}
 				}
 			case *model.Node:
 				if _, present := bodyFields["authorization"]; present {

@@ -444,6 +444,9 @@ const cs_zh = {
     selectApp: '选择应用',
   },
   login: {
+    policyFailed: '无法加载 Web 登录策略，请联系管理员检查服务配置。',
+    oidcUnavailable: 'Web 密码登录已关闭，但尚未启用 OIDC。请联系管理员检查部署和 OIDC 配置。',
+    localLoginDisabled: 'Web 密码登录已关闭，请使用 OIDC。',
     loginText: '维易科技 让运维变简单',
     username: '用户名/邮箱',
     usernameRequired: '请输入用户名或邮箱',
