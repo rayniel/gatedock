@@ -1,4 +1,18 @@
 const oneterm_zh = {
+  desktop: {
+    title: '远程桌面',
+    openInTab: '独立页面连接',
+    openInWorkstation: '工作台内连接',
+    toggleToolbar: '展开 / 收起桌面工具栏',
+    disconnect: '断开连接',
+    disconnected: '远程桌面会话已结束。',
+    reconnect: '重新连接',
+    loading: '正在加载桌面权限和显示设置...',
+    invalidProtocol: '独立桌面页面仅支持 RDP 连接。',
+    permissionDenied: '你没有使用此账号连接资产的权限。',
+    fullscreenFailed: '无法进入或退出全屏，请检查浏览器权限。',
+    preferenceFailed: '加载显示设置失败。'
+  },
   passwordView: {
     approvalUnavailable: '当前版本不支持发起审批，请联系管理员。',
     settingsTitle: '密码查看',

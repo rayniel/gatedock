@@ -6,6 +6,21 @@ This guide helps developers quickly set up OneTerm's development environment for
 
 ## Environment Options
 
+### Standalone RDP sessions
+
+In the workstation RDP menu, choose **Connect in new tab** for an account, or use the
+new-tab icon beside an expanded account. Existing workstation connections remain unchanged.
+The standalone page creates a new connection; it does not transfer an existing session.
+It retains authentication and asset/account permissions without showing the administration layout.
+The top arrow reveals fullscreen, resolution, permission-gated clipboard/file tools, and disconnect.
+Fullscreen requires a click; press Esc to exit. Automatic resolution requests track window size;
+fixed resolutions fit proportionally. Displays without dynamic resolution support still scale
+using their actual remote dimensions.
+
+Validate against a test RDP asset: new-tab and refresh authentication, resizing, fullscreen entry/exit,
+pointer alignment at different scales, tool dialogs, denied permissions, and explicit reconnect.
+Monitor pages must not send resize instructions. Build and deploy the updated frontend image to use this feature.
+
 ### 🎨 Frontend Development Environment
 **For**: Vue.js frontend development, UI debugging, frontend feature development
 - **Containers**: MySQL, Redis, ACL-API, Guacd, OneTerm-API (optional)

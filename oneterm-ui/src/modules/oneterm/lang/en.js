@@ -1,4 +1,18 @@
 const oneterm_en = {
+  desktop: {
+    title: 'Remote desktop',
+    openInTab: 'Connect in new tab',
+    openInWorkstation: 'Connect in workstation',
+    toggleToolbar: 'Show / hide desktop tools',
+    disconnect: 'Disconnect',
+    disconnected: 'The remote desktop session has ended.',
+    reconnect: 'Connect again',
+    loading: 'Loading desktop permissions and preferences...',
+    invalidProtocol: 'This page supports RDP connections only.',
+    permissionDenied: 'You do not have permission to connect with this account.',
+    fullscreenFailed: 'Unable to enter or exit fullscreen. Check browser permissions.',
+    preferenceFailed: 'Failed to load display preferences.'
+  },
   passwordView: {
     approvalUnavailable: 'Approval is unavailable in this edition. Contact an administrator.',
     settingsTitle: 'Password Viewing',

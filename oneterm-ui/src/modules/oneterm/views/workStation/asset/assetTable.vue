@@ -43,6 +43,17 @@
             >
               <ops-icon class="workstation-asset-table-account-protocol" :type="item.protocolIcon" />
               <span class="workstation-asset-table-account-name">{{ item.account_name }}</span>
+              <a-tooltip v-if="item.protocolType === 'rdp'" :title="$t('oneterm.desktop.openInTab')">
+                <a
+                  :href="desktopHref(row, item)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :aria-label="$t('oneterm.desktop.openInTab')"
+                  @click.stop
+                >
+                  <a-icon type="export" />
+                </a>
+              </a-tooltip>
             </div>
           </div>
         </template>
@@ -63,7 +74,27 @@
         <template #default="{ row }">
           <a-space v-if="row.accountList.length">
             <a-tooltip v-for="item in row._protocols" :key="item.key" :title="item.key">
-              <a class="workstation-asset-table-operation-btn" @click="clickProtocol(item, row)">
+              <a-dropdown v-if="item.key === 'rdp'" :trigger="['click']">
+                <a class="workstation-asset-table-operation-btn" @click.stop>
+                  <ops-icon :type="item.icon" />
+                  <a-icon type="down" />
+                </a>
+                <a-menu slot="overlay">
+                  <a-menu-item key="workstation" @click="clickProtocol(item, row)">
+                    {{ $t('oneterm.desktop.openInWorkstation') }}
+                  </a-menu-item>
+                  <a-menu-divider />
+                  <a-menu-item
+                    v-for="account in row.accountList.filter(account => account.protocol === item.value)"
+                    :key="account.protocol + account.account_id"
+                  >
+                    <a :href="desktopHref(row, account)" target="_blank" rel="noopener noreferrer">
+                      {{ $t('oneterm.desktop.openInTab') }} · {{ account.account_name }}
+                    </a>
+                  </a-menu-item>
+                </a-menu>
+              </a-dropdown>
+              <a v-else class="workstation-asset-table-operation-btn" @click="clickProtocol(item, row)">
                 <ops-icon v-if="item.icon" :type="item.icon" />
               </a>
             </a-tooltip>
@@ -155,6 +186,17 @@ export default {
     },
   },
   methods: {
+    desktopHref(row, account) {
+      return this.$router.resolve({
+        name: 'oneterm_desktop',
+        params: {
+          asset_id: row.id,
+          account_id: account.account_id,
+          protocol: account.protocol
+        },
+        query: { title: `${account.account_name}@${row.name}` }
+      }).href
+    },
     updateTableData() {
       this.loading = true
       getAssetList({

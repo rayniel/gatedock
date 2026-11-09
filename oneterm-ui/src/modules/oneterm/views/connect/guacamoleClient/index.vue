@@ -86,8 +86,11 @@ export default {
   data() {
     return {
       client: null,
+      clientState: STATE_IDLE,
       messageKey: 'message',
       resizeObserver: null, // guacamoleClient container size observer
+      resizeHandler: null,
+      requestedSize: null,
       sessionId: '',
     }
   },
@@ -115,6 +118,9 @@ export default {
 
     if (this.resizeObserver) {
       this.resizeObserver.disconnect()
+    }
+    if (this.resizeHandler) {
+      this.resizeHandler.cancel()
     }
 
     if (this.client) {
@@ -174,6 +180,7 @@ export default {
       displayEle.appendChild(element)
 
       const { width, height } = this.getClientSize()
+      this.requestedSize = { width, height }
       let queryString = `w=${width}&h=${height}&dpi=96`
       // workstation page
       if (!is_monitor && !this.shareId) {
@@ -186,8 +193,7 @@ export default {
 
       const display = client.getDisplay()
       display.onresize = () => {
-        const { width, height } = this.getClientSize()
-        display.scale(Math.min(displayEle.clientWidth / width, displayEle.clientHeight / height))
+        this.handleDisplaySize()
       }
 
       const sink = new Guacamole.InputSink()
@@ -211,41 +217,40 @@ export default {
       })
 
       const mouse = new Guacamole.Mouse(element)
+      const sendMouseState = (state) => {
+        if (!is_monitor) {
+          client.sendMouseState(state, true)
+        }
+      }
       mouse.onmousedown = mouse.onmouseup = function(mouseState) {
         sinkFocus()
-        if (!is_monitor) {
-          client.sendMouseState(mouseState)
-        }
+        sendMouseState(mouseState)
       }
       mouse.onmousemove = function(mouseState) {
         sinkFocus()
         client.getDisplay().showCursor(false)
-        mouseState.x = mouseState.x / display.getScale()
-        mouseState.y = mouseState.y / display.getScale()
-        if (!is_monitor) {
-          client.sendMouseState(mouseState)
-        }
+        sendMouseState(mouseState)
       }
 
       const touch = new Guacamole.Mouse.Touchpad(element) // or Guacamole.Touchscreen
 
       touch.onmousedown = touch.onmousemove = touch.onmouseup = function(state) {
-        if (!is_monitor) {
-          client.sendMouseState(state)
-        }
+        sendMouseState(state)
       }
       this.client = client
 
       if (this.$refs.onetermGuacamoleRef) {
-        this.resizeObserver = new ResizeObserver(_.debounce((entries) => {
+        this.resizeHandler = _.debounce((entries) => {
           if (entries?.length) {
             this.handleDisplaySize()
           }
-        }, 200))
+        }, 200)
+        this.resizeObserver = new ResizeObserver(this.resizeHandler)
         this.resizeObserver.observe(this.$refs.onetermGuacamoleRef)
       }
     },
     onClientStateChange(state) {
+      this.clientState = state
       console.log('onClientStateChange', state)
       switch (state) {
         case STATE_IDLE:
@@ -261,6 +266,7 @@ export default {
           this.$message.loading({ content: this.$t('oneterm.guacamole.waiting'), duration: 0, key: this.messageKey })
           break
         case STATE_CONNECTED:
+          this.handleDisplaySize()
           this.$message.destroy(this.messageKey)
           this.$message.success({ content: this.$t('oneterm.guacamole.connected'), duration: 3, key: this.messageKey })
           this.$emit('open')
@@ -284,21 +290,24 @@ export default {
     },
 
     handleDisplaySize() {
-      const { width, height } = this.getClientSize()
-
+      if (!this.client) return
       const guacamoleWrap = this.$refs.onetermGuacamoleRef
-      const scaleW = guacamoleWrap.clientWidth / width
-      const scaleH = guacamoleWrap.clientHeight / height
-
-      const scale = Math.min(scaleW, scaleH)
-      if (!scale) {
-        return
+      if (!guacamoleWrap?.clientWidth || !guacamoleWrap?.clientHeight) return
+      const display = this.client.getDisplay()
+      const width = display.getWidth()
+      const height = display.getHeight()
+      if (width > 0 && height > 0) {
+        display.scale(Math.min(guacamoleWrap.clientWidth / width, guacamoleWrap.clientHeight / height))
       }
-      this.client.getDisplay().scale(scale)
+      if (this.resolution === 'auto') this.handleResolutionUpdate()
     },
 
     handleResolutionUpdate() {
+      if (!this.client || this.$route.query.is_monitor || this.clientState !== STATE_CONNECTED) return
       const { width, height } = this.getClientSize()
+      if (!(width > 0 && height > 0)) return
+      if (this.requestedSize?.width === width && this.requestedSize?.height === height) return
+      this.requestedSize = { width, height }
       this.client.sendSize(width, height)
     },
 
@@ -308,8 +317,8 @@ export default {
       const height = this.resolution === 'auto' ? guacamoleWrap.clientHeight : this.resolution?.[1]
 
       return {
-        width,
-        height
+        width: Number(width),
+        height: Number(height)
       }
     },
 

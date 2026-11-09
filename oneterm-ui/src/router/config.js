@@ -85,6 +85,13 @@ export const generatorDynamicRouter = async () => {
 const constantModuleRouteMap = []
 if (appConfig.buildModules.includes('oneterm')) {
   constantModuleRouteMap.push({
+    path: '/oneterm/desktop/:asset_id/:account_id/:protocol',
+    name: 'oneterm_desktop',
+    hidden: true,
+    component: () => import('@/modules/oneterm/views/connect/desktop'),
+    meta: { title: 'oneterm.menu.terminal', keepAlive: false }
+  })
+  constantModuleRouteMap.push({
     path: '/oneterm/share/:protocol/:id',
     name: 'oneterm_share',
     hidden: true,

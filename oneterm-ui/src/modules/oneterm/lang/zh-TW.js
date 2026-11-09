@@ -1,4 +1,18 @@
 const oneterm_zh = {
+  desktop: {
+    title: '遠端桌面',
+    openInTab: '獨立頁面連線',
+    openInWorkstation: '工作台內連線',
+    toggleToolbar: '展開 / 收起桌面工具列',
+    disconnect: '中斷連線',
+    disconnected: '遠端桌面工作階段已結束。',
+    reconnect: '重新連線',
+    loading: '正在載入桌面權限和顯示設定...',
+    invalidProtocol: '獨立桌面頁面僅支援 RDP 連線。',
+    permissionDenied: '你沒有使用此帳號連線資產的權限。',
+    fullscreenFailed: '無法進入或退出全螢幕，請檢查瀏覽器權限。',
+    preferenceFailed: '載入顯示設定失敗。'
+  },
   passwordView: {
     approvalUnavailable: '目前版本不支援發起審核，請聯絡管理員。',
     settingsTitle: '密碼查看',
