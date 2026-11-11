@@ -26,6 +26,27 @@
 构建环境在 Docker 中，不要求宿主机安装 Go、Node 或 Yarn。
 支持架构以所有依赖镜像的 manifest 为准；本轮验证环境为 Linux x86_64。
 
+### 构建网络与镜像源
+
+ACL 构建默认使用官方 Debian HTTPS 源和 PyPI。若部署服务器访问慢或超时，
+先确认 Docker 容器能够访问你信任的镜像站，再在初始化后的 `deploy-gatedock/.env`
+中增加以下示例（请勿覆盖已有凭据）：
+
+```dotenv
+GATEDOCK_ACL_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn
+GATEDOCK_ACL_PYPI_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+GATEDOCK_API_ALPINE_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/alpine
+```
+
+Debian 地址是同时包含 `/debian` 和 `/debian-security` 的镜像站根地址，不是
+`/debian` 目录；Alpine 地址需包含 `/alpine`。三项可以分别设置，只接受信任的
+HTTPS 源。前两项影响 ACL 构建，Alpine 源影响 API 运行镜像中的 apk 依赖安装；
+都不影响 Docker 基础镜像、Go 或 Yarn 的下载。修改后重新运行 `./gatedock.sh up`；
+不需重新 `init` 或删除数据。APT 源元数据和 APK 包仍通过发行版签名密钥验证。
+Python 依赖锁定版本但未提供包哈希；应评估镜像站的可信度和同步情况。
+这些值是构建参数，可能出现在构建日志或镜像历史中，不要在 URL 中包含密码或令牌。
+使用 `sudo` 时建议将参数写入 `.env`，避免 sudo 清除当前 shell 环境变量。
+
 ## 全新安装
 
 需要 Docker Engine / BuildKit、Docker Compose v2.17+（支持 additional build contexts）、
@@ -134,6 +155,11 @@ APISIX 是外部网关，Nginx 是容器内应用网关和静态文件服务，�
    登录入口 `/api/oidc/login`；登录/回调保持同一域名。
    ACL 登录依赖 Referer，不能配置 `no-referrer` 或丢弃该头。
 
+首页检查到登录会话失效时直接进入登录流程，不弹出该检查的 401 错误，也不再等待
+固定的 3 秒登出延迟。仅启用一个 Web 登录提供方且开启 `auth_auto_redirect` 时，
+直接跳转到该提供方；未开启自动跳转时仍保留原有确认倒计时。
+其他接口的 401、密码错误以及服务端故障仍正常提示。
+
 本配置拒绝信任非指定代理来源伪造的外部协议头；后端只信任 Web 容器地址。
 真实 APISIX 和身份提供方需在你的部署环境完成联调，本轮不声称完成外部端到端认证。
 
@@ -218,6 +244,13 @@ Docker 创建的文件若当前账号无读取权限，应使用具备权限的�
 ```bash
 git submodule update --init --recursive
 ```
+
+如果 `docker info` 提示 Docker socket 权限不足，可先使用 `sudo ./gatedock.sh check`
+和 `sudo ./gatedock.sh up`；`init` 已完成时不要重新运行，避免覆盖已有密钥。
+也可以由管理员将操作账号加入 Docker 组并重新登录；Docker 组具有接近 root 的权限，
+只授予可信账号。若 Git 报仓库所有权不安全，应先核对仓库所有者与执行账号，
+不要通过信任所有目录来绕过检查。使用 sudo 时初始化 submodule 仍应以仓库所有者身份执行，
+避免生成属于 root 的源码文件。
 
 不要直接用该仓库原 Dockerfile：其 requirements.txt 与应用实际运行依赖不一致。
 本目录 `acl/Dockerfile` 从 Python 基础镜像开始构建，不继承上游 ACL 镜像；

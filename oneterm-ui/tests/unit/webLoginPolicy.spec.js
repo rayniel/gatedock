@@ -3,6 +3,8 @@ import LoginPage from '@/views/user/Login'
 import user from '@/store/global/user'
 import { getAuthDataEnable, getWebLoginPolicy } from '@/api/auth'
 import { login } from '@/api/login'
+import Vue from 'vue'
+import { ACCESS_TOKEN } from '@/store/global/mutation-types'
 
 jest.mock('@/utils/util', () => ({ timeFix: jest.fn() }))
 jest.mock('@/utils/request', () => ({ axios: jest.fn() }))
@@ -92,5 +94,21 @@ describe('Web login deployment policy', () => {
     await expect(user.actions.Login({ commit }, { userInfo: {}, auth_type: 'OIDC' })).resolves.toBeUndefined()
     expect(login).toHaveBeenCalledWith({}, 'OIDC')
     expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('clears expired session credentials without clearing unrelated preferences', () => {
+    Vue.ls = { remove: jest.fn() }
+    localStorage.setItem('ops_auth_type', 'OIDC')
+    localStorage.setItem('desktop-preference', 'keep')
+    const commit = jest.fn()
+    user.actions.ResetSession({ commit })
+    expect(commit.mock.calls).toEqual([
+      ['SET_MFA_TOKEN', { valid_time: 0, value: '', scope: '' }],
+      ['SET_TOKEN', ''],
+      ['SET_ROLES', []]
+    ])
+    expect(Vue.ls.remove).toHaveBeenCalledWith(ACCESS_TOKEN)
+    expect(localStorage.getItem('ops_auth_type')).toBeNull()
+    expect(localStorage.getItem('desktop-preference')).toBe('keep')
   })
 })

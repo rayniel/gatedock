@@ -23,9 +23,28 @@ const whitePath = [
 ]
 const startsMathWhitePath = ['/oneterm/share']
 
-// Only handle user info authentication here, not login logic.
-// Frontend permission handling; axios handles 401 -> login.
-// Login page handles whether to use SSO.
+async function redirectToLogin(to, next) {
+  try {
+    await store.dispatch('GetAuthDataEnable')
+  } catch (error) {
+    message.error(i18n.t('cs.login.policyFailed'))
+    next({ path: '/user/login', query: { redirect: to.fullPath } })
+    return
+  }
+  const auth = store.state.user.auth_enable
+  const providers = webLoginProviders(auth)
+  if (providers.length === 1 && auth.auth_auto_redirect) {
+    await store.dispatch('Login', { userInfo: {}, auth_type: providers[0].auth_type })
+    NProgress.done()
+    next(false)
+    return
+  }
+  next({
+    path: providers.length === 1 ? '/user/logout' : '/user/login',
+    query: { redirect: to.fullPath }
+  })
+}
+
 router.beforeEach(async (to, from, next) => {
   NProgress.start() // start progress bar
   to.meta && (!!to.meta.title && setDocumentTitle(`${i18n.t(to.meta.title)} - ${domTitle}`))
@@ -37,10 +56,10 @@ router.beforeEach(async (to, from, next) => {
   ) {
     next()
   } else if ((auth_type || (!auth_type && Vue.ls.get(ACCESS_TOKEN))) && store.getters.roles.length === 0) {
-    store.dispatch('GetAuthDataEnable').catch(() => {
-      message.error(i18n.t('cs.login.policyFailed'))
-    })
-    store.dispatch('GetInfo').then(res => {
+    return store.dispatch('GetInfo').then(res => {
+      store.dispatch('GetAuthDataEnable').catch(() => {
+        message.error(i18n.t('cs.login.policyFailed'))
+      })
       const roles = res.result && res.result.role
       store.dispatch('loadAllUsers')
       store.dispatch('loadAllEmployees')
@@ -56,25 +75,19 @@ router.beforeEach(async (to, from, next) => {
           next({ path: redirect })
         }
       })
-    }).catch((e) => {
-      setTimeout(() => { store.dispatch('Logout') }, 3000)
+    }).catch(async (error) => {
+      if (error.response?.status === 401) {
+        await store.dispatch('ResetSession')
+        await redirectToLogin(to, next)
+      } else {
+        NProgress.done()
+        next(false)
+      }
     })
   } else if (to.path === '/user/login' && !auth_type && store.getters.roles.length !== 0) {
     next({ path: '/' })
   } else if (!auth_type && !Vue.ls.get(ACCESS_TOKEN) && to.path !== '/user/login') {
-    try {
-      await store.dispatch('GetAuthDataEnable')
-    } catch (error) {
-      message.error(i18n.t('cs.login.policyFailed'))
-      next({ path: '/user/login', query: { redirect: to.fullPath } })
-      return
-    }
-    const _enable_list = webLoginProviders(store?.state?.user?.auth_enable)
-    if (_enable_list.length === 1) {
-      next({ path: '/user/logout', query: { redirect: to.fullPath } })
-    } else {
-      next({ path: '/user/login', query: { redirect: to.fullPath } })
-    }
+    await redirectToLogin(to, next)
   } else {
     next()
   }

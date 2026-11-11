@@ -8,7 +8,15 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /build/server ./cmd/server
 
 FROM alpine:3.23
-RUN apk add --no-cache ca-certificates tzdata
+ARG ALPINE_MIRROR=https://dl-cdn.alpinelinux.org/alpine
+RUN printf '%s\n' "$ALPINE_MIRROR" | grep -Eq '^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?(/[A-Za-z0-9._-]+)*/?$' \
+    || { echo "Invalid Alpine mirror: expected an HTTPS URL without credentials" >&2; exit 1; }; \
+    mirror="${ALPINE_MIRROR%/}"; \
+    if [ "$(grep -c '^https://dl-cdn.alpinelinux.org/alpine/' /etc/apk/repositories)" -ne 2 ]; then \
+      echo "Unexpected Alpine base-image repositories" >&2; exit 1; \
+    fi; \
+    sed -i "s|^https://dl-cdn.alpinelinux.org/alpine/|$mirror/|" /etc/apk/repositories \
+    && apk add --no-cache ca-certificates tzdata
 ENV TZ=Asia/Shanghai
 ENV TERM=xterm-256color
 ENV ONETERM_CONFIG_FILE=/oneterm/config.yaml

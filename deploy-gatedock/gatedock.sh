@@ -4,10 +4,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 umask 077
 ACL_SOURCE="$DIR/../third_party/gatedock-acl"
-if [[ -f "$ACL_SOURCE/.git" ]]; then
-    export GATEDOCK_ACL_REVISION
-    GATEDOCK_ACL_REVISION="$(git -C "$ACL_SOURCE" rev-parse HEAD)"
-fi
 files=(-f "$DIR/docker-compose.yaml")
 if [[ "${1:-}" == "--ssh" ]]; then
     files+=(-f "$DIR/docker-compose.ssh.yaml")
@@ -105,8 +101,18 @@ EOF
 check() {
     require_tools
     [[ -f .env && -f runtime/config.yaml ]] || fail "Run ./gatedock.sh init first"
-    [[ -f "$ACL_SOURCE/acl-api/autoapp.py" ]] || fail "Run git submodule update --init --recursive from the repository root"
-    [[ -z "$(git -C "$ACL_SOURCE" status --porcelain)" ]] || fail "ACL submodule has uncommitted changes; commit them before building"
+    command -v git >/dev/null || fail "Git is required to inspect the ACL source"
+    [[ -e "$ACL_SOURCE/.git" && -f "$ACL_SOURCE/acl-api/autoapp.py" ]] ||
+        fail "ACL source is not initialized. Run: git submodule update --init --recursive from the repository root"
+    local acl_status
+    if ! GATEDOCK_ACL_REVISION="$(git -C "$ACL_SOURCE" rev-parse --verify HEAD)"; then
+        fail "Cannot read the ACL Git revision; check repository ownership and Git permissions"
+    fi
+    if ! acl_status="$(git -C "$ACL_SOURCE" status --porcelain)"; then
+        fail "Cannot check ACL source status; check repository ownership and Git permissions"
+    fi
+    [[ -z "$acl_status" ]] || fail "ACL submodule has uncommitted changes; commit them before building"
+    export GATEDOCK_ACL_REVISION
     compose config --quiet
 }
 verify() {

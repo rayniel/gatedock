@@ -4,7 +4,6 @@ import { VueAxios } from './axios'
 import message from 'ant-design-vue/es/message'
 import notification from 'ant-design-vue/es/notification'
 import { ACCESS_TOKEN } from '@/store/global/mutation-types'
-import router from '@/router'
 import store from '@/store'
 import i18n from '@/lang'
 
@@ -19,7 +18,9 @@ const err = (error) => {
   if (axios.isCancel(error)) return Promise.reject(error)
   console.warn('API request failed', { method: error.config?.method, status: error.response?.status })
   const reg = /5\d{2}/g
-  if (error.response && reg.test(error.response.status)) {
+  if (error.response?.status === 401 && error.config?.skipUnauthorizedMessage) {
+    // An expired session is handled by the route guard, not an error toast.
+  } else if (error.response && reg.test(error.response.status)) {
     const errorMsg = ((error.response || {}).data || {}).message || i18n.t('requestServiceError')
     message.error(errorMsg)
   } else if (error.response?.status === 404 && error.config?.url.includes('ci_types')) {
@@ -54,11 +55,6 @@ const err = (error) => {
   } else {
     const errorMsg = ((error.response || {}).data || {}).message || i18n.t('requestError')
     message.error(`${errorMsg}`)
-  }
-  if (error.response) {
-    if (error.response.status === 401 && router.path === '/user/login') {
-      window.location.href = '/user/logout'
-    }
   }
   return Promise.reject(error)
 }

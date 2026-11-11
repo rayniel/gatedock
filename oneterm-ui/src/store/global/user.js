@@ -238,6 +238,14 @@ const user = {
       })
     },
 
+    ResetSession({ commit }) {
+      commit('SET_MFA_TOKEN', { valid_time: 0, value: '', scope: '' })
+      commit('SET_TOKEN', '')
+      commit('SET_ROLES', [])
+      Vue.ls.remove(ACCESS_TOKEN)
+      localStorage.removeItem('ops_auth_type')
+    },
+
     // 登出
     async Logout({ commit, state }) {
       try {
