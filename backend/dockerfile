@@ -8,7 +8,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /build/server ./cmd/server
 
 FROM alpine:3.23
-ARG ALPINE_MIRROR=https://dl-cdn.alpinelinux.org/alpine
+ARG ALPINE_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/alpine
 RUN printf '%s\n' "$ALPINE_MIRROR" | grep -Eq '^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?(/[A-Za-z0-9._-]+)*/?$' \
     || { echo "Invalid Alpine mirror: expected an HTTPS URL without credentials" >&2; exit 1; }; \
     mirror="${ALPINE_MIRROR%/}"; \

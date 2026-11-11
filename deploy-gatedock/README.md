@@ -28,9 +28,10 @@
 
 ### 构建网络与镜像源
 
-ACL 构建默认使用官方 Debian HTTPS 源和 PyPI。若部署服务器访问慢或超时，
-先确认 Docker 容器能够访问你信任的镜像站，再在初始化后的 `deploy-gatedock/.env`
-中增加以下示例（请勿覆盖已有凭据）：
+默认使用国内构建源：Debian、PyPI 和 Alpine 使用清华镜像，
+Go 使用 `https://goproxy.cn,direct`，Yarn 使用 `https://registry.npmmirror.com/`。
+无需额外配置；若需要覆盖软件源，可在初始化后的 `deploy-gatedock/.env`
+中设置以下变量（示例为默认值，请勿覆盖已有凭据）：
 
 ```dotenv
 GATEDOCK_ACL_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn
@@ -46,6 +47,8 @@ HTTPS 源。前两项影响 ACL 构建，Alpine 源影响 API 运行镜像中的
 Python 依赖锁定版本但未提供包哈希；应评估镜像站的可信度和同步情况。
 这些值是构建参数，可能出现在构建日志或镜像历史中，不要在 URL 中包含密码或令牌。
 使用 `sudo` 时建议将参数写入 `.env`，避免 sudo 清除当前 shell 环境变量。
+基础镜像仍使用官方名称，拉取由 Docker 守护进程的网络及镜像加速配置决定，
+上述软件源不会加速基础镜像拉取。已有 `.env` 中显式设置的源优先于新默认值。
 
 ## 全新安装
 

@@ -13,7 +13,7 @@ services:
       context: ../backend
       dockerfile: dockerfile
       args:
-        ALPINE_MIRROR: ${GATEDOCK_API_ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}
+        ALPINE_MIRROR: ${GATEDOCK_API_ALPINE_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/alpine}
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp
     volumes:
@@ -111,8 +111,8 @@ services:
         acl-source: ../third_party/gatedock-acl
       args:
         ACL_REVISION: ${GATEDOCK_ACL_REVISION:?Use ./gatedock.sh or set the pinned ACL revision}
-        DEBIAN_MIRROR: ${GATEDOCK_ACL_DEBIAN_MIRROR:-https://deb.debian.org}
-        PYPI_INDEX_URL: ${GATEDOCK_ACL_PYPI_INDEX_URL:-https://pypi.org/simple}
+        DEBIAN_MIRROR: ${GATEDOCK_ACL_DEBIAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}
+        PYPI_INDEX_URL: ${GATEDOCK_ACL_PYPI_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     environment: &acl-environment
       SECRET_KEY: ${GATEDOCK_SESSION_SECRET:?Missing session secret}
       DB_ACL_PASSWORD: ${DB_ACL_PASSWORD:?Missing ACL database password}
