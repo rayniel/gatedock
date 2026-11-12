@@ -24,11 +24,12 @@
 
     <div class="standalone-desktop-controls" @keydown.stop @keyup.stop>
       <a-button
+        class="standalone-desktop-toggle"
         :aria-label="$t('oneterm.desktop.toggleToolbar')"
-        :aria-expanded="toolbarVisible"
+        :aria-expanded="String(toolbarVisible)"
         @click="toolbarVisible = !toolbarVisible"
       >
-        <a-icon :type="toolbarVisible ? 'up' : 'down'" />
+        <a-icon :type="toolbarVisible ? 'right' : 'left'" />
       </a-button>
       <div v-show="toolbarVisible" class="standalone-desktop-toolbar">
         <span class="standalone-desktop-title" :title="title">{{ title }}</span>
@@ -184,23 +185,37 @@ export default {
 
   &-controls {
     position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
     z-index: 1001;
+    display: flex;
+    align-items: center;
     max-width: 100%;
-    text-align: center;
+    max-height: 100%;
+  }
+
+  &-toggle {
+    flex-shrink: 0;
+    padding: 0 8px;
+    border-radius: 8px 0 0 8px;
   }
 
   &-toolbar {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    min-width: 0;
+    max-height: 100vh;
+    overflow-y: auto;
     gap: 8px;
     padding: 8px;
     background: #1d2129;
-    border-radius: 0 0 8px 8px;
+    border-radius: 8px 0 0 8px;
+    text-align: center;
+
+    > * {
+      flex-shrink: 0;
+    }
   }
 
   &-title {

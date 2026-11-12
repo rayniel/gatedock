@@ -27,7 +27,10 @@ describe('standalone RDP desktop', () => {
       $t: key => key,
       $message: message
     },
-    stubs: ['a-icon', 'a-button']
+    stubs: {
+      'a-icon': true,
+      'a-button': { template: '<button v-bind="$attrs" v-on="$listeners"><slot /></button>' }
+    }
   })
 
   beforeEach(() => {
@@ -65,6 +68,22 @@ describe('standalone RDP desktop', () => {
     expect(wrapper.vm.ready).toBe(false)
     expect(wrapper.findComponent({ name: 'GuacamolePanel' }).exists()).toBe(false)
     expect(message.error).toHaveBeenCalledWith('oneterm.desktop.permissionDenied')
+  })
+
+  it('collapses the side toolbar by default and switches its horizontal arrow when toggled', async () => {
+    wrapper = mount()
+    await settle()
+    const toolbar = wrapper.find('.standalone-desktop-toolbar')
+    const toggle = wrapper.find('.standalone-desktop-toggle')
+    expect(toolbar.isVisible()).toBe(false)
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(toggle.find('a-icon-stub').attributes('type')).toBe('left')
+    await toggle.trigger('click')
+    expect(toolbar.isVisible()).toBe(true)
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(toggle.find('a-icon-stub').attributes('type')).toBe('right')
+    await toggle.trigger('click')
+    expect(toolbar.isVisible()).toBe(false)
   })
 
   it('reports permission service failures without opening a session', async () => {
