@@ -47,6 +47,8 @@ const STATE_CONNECTED = 3
 const STATE_DISCONNECTING = 4
 const STATE_DISCONNECTED = 5
 const META_KEYS = [65511, 65512, 65515, 65516]
+const CLIPBOARD_MOUSE_TIMEOUT = 5000
+const CLIPBOARD_MOUSE_QUEUE_LIMIT = 128
 
 export default {
   name: 'GuacamoleClient',
@@ -96,6 +98,8 @@ export default {
       sessionId: '',
       clipboardWarningShown: false,
       clipboardPastePending: false,
+      clipboardMousePending: null,
+      mouseRightPressed: false,
       disposed: false,
       keyboard: null,
     }
@@ -124,6 +128,10 @@ export default {
   },
   beforeDestroy() {
     this.disposed = true
+    if (this.clipboardMousePending) {
+      clearTimeout(this.clipboardMousePending.timer)
+      this.clipboardMousePending = null
+    }
     this.$message.destroy(this.messageKey)
 
     if (this.resizeObserver) {
@@ -246,14 +254,14 @@ export default {
           client.sendMouseState(state, true)
         }
       }
-      mouse.onmousedown = mouse.onmouseup = function(mouseState) {
+      mouse.onmousedown = mouse.onmouseup = (mouseState) => {
         sinkFocus()
-        sendMouseState(mouseState)
+        this.handleMouseState(mouseState, Boolean(is_monitor))
       }
-      mouse.onmousemove = function(mouseState) {
+      mouse.onmousemove = (mouseState) => {
         sinkFocus()
         client.getDisplay().showCursor(false)
-        sendMouseState(mouseState)
+        this.handleMouseState(mouseState, Boolean(is_monitor))
       }
 
       const touch = new Guacamole.Mouse.Touchpad(element) // or Guacamole.Touchscreen
@@ -454,6 +462,66 @@ export default {
         .finally(() => {
           this.clipboardPastePending = false
         })
+    },
+
+    handleMouseState(state, isMonitor) {
+      if (isMonitor) return
+      const rightPressed = state.right && !this.mouseRightPressed
+      this.mouseRightPressed = Boolean(state.right)
+      const snapshot = {
+        x: state.x,
+        y: state.y,
+        left: state.left,
+        middle: state.middle,
+        right: state.right,
+        up: state.up,
+        down: state.down
+      }
+
+      if (this.clipboardMousePending) {
+        const states = this.clipboardMousePending.states
+        const last = states[states.length - 1]
+        const previous = states[states.length - 2]
+        const buttons = ['left', 'middle', 'right', 'up', 'down']
+        if (previous && buttons.every(button => last[button] === snapshot[button] && previous[button] === last[button])) {
+          states[states.length - 1] = snapshot
+        } else {
+          states.push(snapshot)
+        }
+        if (this.clipboardMousePending.states.length >= CLIPBOARD_MOUSE_QUEUE_LIMIT) {
+          this.finishClipboardMouse(this.clipboardMousePending, false)
+        }
+        return
+      }
+      if (!rightPressed || !this.directClipboard || !this.assetPermissions?.[PERMISSION_TYPE.PASTE] ||
+          this.clientState !== STATE_CONNECTED) {
+        this.client.sendMouseState(snapshot, true)
+        return
+      }
+      if (!window.isSecureContext || !navigator.clipboard?.readText) {
+        this.$message.warning(this.$t('oneterm.guacamole.clipboardContextFailed'))
+        this.client.sendMouseState(snapshot, true)
+        return
+      }
+
+      const pending = { states: [snapshot], timer: null }
+      this.clipboardMousePending = pending
+      pending.timer = setTimeout(() => this.finishClipboardMouse(pending, false), CLIPBOARD_MOUSE_TIMEOUT)
+      navigator.clipboard.readText()
+        .then(content => {
+          if (this.clipboardMousePending !== pending || this.disposed) return
+          const synchronized = this.directClipboard && this.handleClipboardOk(content)
+          this.finishClipboardMouse(pending, Boolean(synchronized))
+        }, () => this.finishClipboardMouse(pending, false))
+    },
+
+    finishClipboardMouse(pending, synchronized) {
+      if (this.clipboardMousePending !== pending) return
+      clearTimeout(pending.timer)
+      this.clipboardMousePending = null
+      if (this.disposed || this.clientState !== STATE_CONNECTED) return
+      if (!synchronized) this.$message.warning(this.$t('oneterm.guacamole.clipboardContextFailed'))
+      pending.states.forEach(state => this.client.sendMouseState(state, true))
     },
 
     sendPasteShortcut(pressed) {

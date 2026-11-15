@@ -42,7 +42,7 @@ describe('direct text clipboard', () => {
       ...GuacamoleClient.methods,
       directClipboard: true,
       clientState: 3,
-      client: { createClipboardStream: jest.fn(), sendKeyEvent: jest.fn() },
+      client: { createClipboardStream: jest.fn(), sendKeyEvent: jest.fn(), sendMouseState: jest.fn() },
       assetPermissions: { copy: true, paste: true },
       $route: { query: {} },
       $message: { warning: jest.fn() },
@@ -139,6 +139,88 @@ describe('direct text clipboard', () => {
     expect(navigator.clipboard.readText).not.toHaveBeenCalled()
     expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
     expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardUnavailable')
+  })
+
+  it('synchronizes fresh text before replaying the right click and release', async () => {
+    let resolveRead
+    navigator.clipboard.readText.mockReturnValue(new Promise(resolve => { resolveRead = resolve }))
+    const state = { x: 10, y: 20, left: false, middle: false, right: true, up: false, down: false }
+    vm.handleMouseState(state, false)
+    state.right = false
+    vm.handleMouseState(state, false)
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(vm.client.sendMouseState).not.toHaveBeenCalled()
+    resolveRead('fresh text')
+    await Promise.resolve()
+    expect(writer.sendText).toHaveBeenCalledWith('fresh text')
+    expect(writer.sendEnd.mock.invocationCallOrder[0]).toBeLessThan(vm.client.sendMouseState.mock.invocationCallOrder[0])
+    expect(vm.client.sendMouseState.mock.calls.map(call => call[0].right)).toEqual([true, false])
+    expect(vm.clipboardMousePending).toBeNull()
+  })
+
+  it.each(['disabled', 'denied', 'monitor'])('does not read clipboard for a %s right click', mode => {
+    if (mode === 'disabled') vm.directClipboard = false
+    if (mode === 'denied') vm.assetPermissions.paste = false
+    vm.handleMouseState({ x: 1, y: 2, right: true }, mode === 'monitor')
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+    expect(vm.client.sendMouseState).toHaveBeenCalledTimes(mode === 'monitor' ? 0 : 1)
+  })
+
+  it('warns and opens the remote menu if clipboard read is rejected', async () => {
+    navigator.clipboard.readText.mockRejectedValue(new Error('permission denied'))
+    vm.handleMouseState({ x: 1, y: 2, right: true }, false)
+    vm.handleMouseState({ x: 1, y: 2, right: false }, false)
+    await Promise.resolve()
+    expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardContextFailed')
+    expect(vm.client.createClipboardStream).not.toHaveBeenCalled()
+    expect(vm.client.sendMouseState.mock.calls.map(call => call[0].right)).toEqual([true, false])
+  })
+
+  it('warns and forwards the right click when clipboard access is unavailable', () => {
+    Object.defineProperty(window, 'isSecureContext', { value: false })
+    vm.handleMouseState({ x: 1, y: 2, right: true }, false)
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+    expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardContextFailed')
+    expect(vm.client.sendMouseState).toHaveBeenCalledWith(expect.objectContaining({ right: true }), true)
+  })
+
+  it('coalesces mouse moves while preserving button transitions during a pending read', async () => {
+    let resolveRead
+    navigator.clipboard.readText.mockReturnValue(new Promise(resolve => { resolveRead = resolve }))
+    vm.handleMouseState({ x: 1, y: 2, right: true }, false)
+    for (let x = 2; x < 200; x++) vm.handleMouseState({ x, y: 2, right: true }, false)
+    vm.handleMouseState({ x: 199, y: 2, right: false }, false)
+    expect(vm.clipboardMousePending.states.length).toBe(3)
+    expect(vm.$message.warning).not.toHaveBeenCalled()
+    resolveRead('text')
+    await Promise.resolve()
+    expect(vm.client.sendMouseState.mock.calls.map(call => [call[0].x, call[0].right]))
+      .toEqual([[1, true], [199, true], [199, false]])
+  })
+
+  it('times out without blocking the remote menu or sending a late clipboard result', async () => {
+    jest.useFakeTimers()
+    try {
+      let resolveRead
+      navigator.clipboard.readText.mockReturnValue(new Promise(resolve => { resolveRead = resolve }))
+      vm.handleMouseState({ x: 1, y: 2, right: true }, false)
+      vm.handleMouseState({ x: 1, y: 2, right: false }, false)
+      jest.advanceTimersByTime(5000)
+      expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardContextFailed')
+      expect(vm.client.sendMouseState.mock.calls.map(call => call[0].right)).toEqual([true, false])
+      resolveRead('late text')
+      await Promise.resolve()
+      expect(vm.client.createClipboardStream).not.toHaveBeenCalled()
+      expect(vm.client.sendMouseState).toHaveBeenCalledTimes(2)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('passes ordinary mouse movements without reading the clipboard', () => {
+    vm.handleMouseState({ x: 10, y: 20, right: false }, false)
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+    expect(vm.client.sendMouseState).toHaveBeenCalledTimes(1)
   })
 
   it('does not intercept paste when disabled or disconnected', () => {
