@@ -96,6 +96,8 @@ export default {
       sessionId: '',
       clipboardWarningShown: false,
       clipboardSyncGeneration: 0,
+      clipboardAuthorizationAttempted: false,
+      remoteClipboardContent: null,
       suppressedPasteKeys: {},
       disposed: false,
       keyboard: null,
@@ -111,6 +113,9 @@ export default {
     }
   },
   watch: {
+    directClipboard(enabled) {
+      if (enabled) this.syncClipboardOnConnect()
+    },
     resolution: {
       handler() {
         this.handleResolutionUpdate()
@@ -278,6 +283,7 @@ export default {
           this.$message.destroy(this.messageKey)
           this.$message.success({ content: this.$t('oneterm.guacamole.connected'), duration: 3, key: this.messageKey })
           this.$emit('open')
+          this.syncClipboardOnConnect()
           // 向后台发送请求，更新会话的状态
           //   sessionApi.connect(sessionId)
           break
@@ -367,6 +373,7 @@ export default {
         stringReader.onend = () => {
           if (this.disposed || !this.assetPermissions?.[PERMISSION_TYPE.COPY]) return
           this.clipboardSyncGeneration++
+          this.remoteClipboardContent = str
           if (this.directClipboard) {
             if (!this.$refs.onetermGuacamoleRef.contains(document.activeElement) || !document.hasFocus()) return
             if (!window.isSecureContext || !navigator.clipboard?.writeText) {
@@ -381,12 +388,16 @@ export default {
       }
     },
 
-    handleClipboardOk(content) {
+    handleClipboardOk(content, skipUnchanged = false) {
       if (!this.assetPermissions?.[PERMISSION_TYPE.PASTE] || this.$route?.query?.is_monitor) {
         this.$message.warning(this.$t('oneterm.guacamole.clipboardPermissionDenied'))
         return
       }
       if (this.client && this.clientState === STATE_CONNECTED && typeof content === 'string') {
+        // Reopening a clipboard stream clears guacd's clipboard before the
+        // new data arrives, even when it is identical to the previous data.
+        if (skipUnchanged && this.assetPermissions?.[PERMISSION_TYPE.COPY] &&
+            content === this.remoteClipboardContent) return true
         const stream = this.client.createClipboardStream('text/plain')
         const writer = new Guacamole.StringWriter(stream)
 
@@ -395,6 +406,7 @@ export default {
         }
 
         writer.sendEnd()
+        this.remoteClipboardContent = content
         return true
       }
     },
@@ -412,7 +424,7 @@ export default {
         this.warnClipboard('clipboardFailed')
         return
       }
-      if (this.handleClipboardOk(event.clipboardData.getData('text/plain'))) {
+      if (this.handleClipboardOk(event.clipboardData.getData('text/plain'), true)) {
         this.sendPasteShortcut(this.keyboard?.pressed || {})
       }
     },
@@ -442,26 +454,43 @@ export default {
       this.client.sendKeyEvent(0, keysym)
     },
 
-    async syncClipboardOnFocus() {
+    syncClipboardOnConnect() {
+      if (this.clipboardAuthorizationAttempted || this.disposed || !this.directClipboard ||
+          !this.assetPermissions?.[PERMISSION_TYPE.PASTE] || this.clientState !== STATE_CONNECTED) return
+      this.clipboardAuthorizationAttempted = true
+      return this.syncLocalClipboard(true)
+    },
+
+    syncClipboardOnFocus() {
+      return this.syncLocalClipboard(false)
+    },
+
+    async syncLocalClipboard(requestPermission) {
       const focused = () => !this.disposed && this.directClipboard &&
         this.assetPermissions?.[PERMISSION_TYPE.PASTE] &&
         this.clientState === STATE_CONNECTED && document.hasFocus() &&
-        this.$refs.onetermGuacamoleRef?.contains(document.activeElement)
-      if (!focused() || !window.isSecureContext || !navigator.permissions?.query ||
-          !navigator.clipboard?.readText) return
-
-      const generation = ++this.clipboardSyncGeneration
-      let permission
-      try {
-        permission = await navigator.permissions.query({ name: 'clipboard-read' })
-      } catch (error) {
-        console.warn('Clipboard read permission check unavailable', error.name)
+        (requestPermission || this.$refs.onetermGuacamoleRef?.contains(document.activeElement))
+      if (!focused()) return
+      if (!window.isSecureContext || !navigator.clipboard?.readText) {
+        if (requestPermission) this.warnClipboard('clipboardUnavailable')
         return
       }
-      if (permission.state !== 'granted' || !focused() || generation !== this.clipboardSyncGeneration) return
+
+      const generation = ++this.clipboardSyncGeneration
+      if (!requestPermission) {
+        if (!navigator.permissions?.query) return
+        let permission
+        try {
+          permission = await navigator.permissions.query({ name: 'clipboard-read' })
+        } catch (error) {
+          console.warn('Clipboard read permission check unavailable', error.name)
+          return
+        }
+        if (permission.state !== 'granted' || !focused() || generation !== this.clipboardSyncGeneration) return
+      }
       try {
         const content = await navigator.clipboard.readText()
-        if (focused() && generation === this.clipboardSyncGeneration) this.handleClipboardOk(content)
+        if (focused() && generation === this.clipboardSyncGeneration) this.handleClipboardOk(content, true)
       } catch (error) {
         this.warnClipboard('clipboardFailed')
       }

@@ -150,6 +150,96 @@ describe('direct text clipboard', () => {
     expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
   })
 
+  it('requests initial authorization once per session, not on subsequent focus', async () => {
+    navigator.permissions.query.mockResolvedValue({ state: 'prompt' })
+    await vm.syncClipboardOnConnect()
+    await vm.syncClipboardOnConnect()
+    await vm.syncClipboardOnFocus()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(writer.sendText).toHaveBeenCalledWith('local text')
+    expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
+  })
+
+  it('starts initial authorization when the connection is established', async () => {
+    vm.handleDisplaySize = jest.fn()
+    vm.$message.destroy = jest.fn()
+    vm.$message.success = jest.fn()
+    vm.$emit = jest.fn()
+    vm.syncLocalClipboard = jest.fn(vm.syncLocalClipboard.bind(vm))
+    vm.onClientStateChange(3)
+    await vm.syncLocalClipboard.mock.results[0].value
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(writer.sendText).toHaveBeenCalledWith('local text')
+  })
+
+  it('does not require the asynchronously focused input sink for initial authorization', async () => {
+    navigator.permissions.query.mockResolvedValue({ state: 'prompt' })
+    vm.$refs.onetermGuacamoleRef.contains = () => false
+    await vm.syncClipboardOnConnect()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['disabled', 'denied', 'disconnected', 'disposed'])('does not request initial authorization when %s', async mode => {
+    if (mode === 'disabled') vm.directClipboard = false
+    if (mode === 'denied') vm.assetPermissions.paste = false
+    if (mode === 'disconnected') vm.clientState = 5
+    if (mode === 'disposed') vm.disposed = true
+    await vm.syncClipboardOnConnect()
+    expect(navigator.permissions.query).not.toHaveBeenCalled()
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+    expect(vm.clipboardAuthorizationAttempted).toBe(false)
+  })
+
+  it('reports previously denied initial authorization without requesting on every focus', async () => {
+    navigator.permissions.query.mockResolvedValue({ state: 'denied' })
+    navigator.clipboard.readText.mockRejectedValue(new Error('permission denied'))
+    await vm.syncClipboardOnConnect()
+    await vm.syncClipboardOnFocus()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(vm.$message.warning).toHaveBeenCalledTimes(1)
+  })
+
+  it('requests initial authorization even when permission queries are unsupported', async () => {
+    Object.defineProperty(navigator, 'permissions', { configurable: true, value: undefined })
+    await vm.syncClipboardOnConnect()
+    await vm.syncClipboardOnFocus()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(writer.sendText).toHaveBeenCalledWith('local text')
+  })
+
+  it('does not clear an already synchronized clipboard when the browser paste event arrives', async () => {
+    await vm.syncClipboardOnFocus()
+    vm.handleDirectPaste(paste)
+    expect(vm.client.createClipboardStream).toHaveBeenCalledTimes(1)
+    expect(writer.sendEnd).toHaveBeenCalledTimes(1)
+    expect(vm.client.sendKeyEvent).toHaveBeenCalledWith(1, 118)
+
+    navigator.clipboard.readText.mockResolvedValue('second text')
+    await vm.syncClipboardOnFocus()
+    paste.clipboardData.getData.mockReturnValue('second text')
+    vm.handleDirectPaste(paste)
+    expect(vm.client.createClipboardStream).toHaveBeenCalledTimes(2)
+    expect(writer.sendText).toHaveBeenLastCalledWith('second text')
+    expect(writer.sendEnd).toHaveBeenCalledTimes(2)
+  })
+
+  it('updates the deduplication state when the remote clipboard changes', () => {
+    vm.handleClipboardOk('local text')
+    vm.handleClipboardReceived({}, 'text/plain')
+    reader.ontext('remote text')
+    reader.onend()
+    vm.handleDirectPaste(paste)
+    expect(vm.client.createClipboardStream).toHaveBeenCalledTimes(2)
+    expect(writer.sendText).toHaveBeenLastCalledWith('local text')
+  })
+
+  it('resends text when remote clipboard changes cannot be observed without copy permission', () => {
+    vm.assetPermissions.copy = false
+    vm.handleDirectPaste(paste)
+    vm.handleDirectPaste(paste)
+    expect(vm.client.createClipboardStream).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['prompt', 'denied'])('does not request clipboard data when permission is %s', async state => {
     navigator.permissions.query.mockResolvedValue({ state })
     await vm.syncClipboardOnFocus()
