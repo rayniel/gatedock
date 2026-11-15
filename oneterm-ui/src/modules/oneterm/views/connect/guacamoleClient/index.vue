@@ -104,6 +104,9 @@ export default {
     }
   },
   computed: {
+    isStandaloneDesktop() {
+      return this.$route?.name === 'oneterm_desktop'
+    },
     directClipboard() {
       return this.preferenceSetting?.settings?.directClipboard === true && !this.$route?.query?.is_monitor
     },
@@ -375,7 +378,8 @@ export default {
           this.clipboardSyncGeneration++
           this.remoteClipboardContent = str
           if (this.directClipboard) {
-            if (!this.$refs.onetermGuacamoleRef.contains(document.activeElement) || !document.hasFocus()) return
+            if (!document.hasFocus() || (!this.isStandaloneDesktop &&
+                !this.$refs.onetermGuacamoleRef.contains(document.activeElement))) return
             if (!window.isSecureContext || !navigator.clipboard?.writeText) {
               this.warnClipboard('clipboardUnavailable')
               return
@@ -456,12 +460,16 @@ export default {
 
     syncClipboardOnConnect() {
       if (this.clipboardAuthorizationAttempted || this.disposed || !this.directClipboard ||
-          !this.assetPermissions?.[PERMISSION_TYPE.PASTE] || this.clientState !== STATE_CONNECTED) return
+          !this.assetPermissions?.[PERMISSION_TYPE.PASTE] || this.clientState !== STATE_CONNECTED ||
+          (this.isStandaloneDesktop && !document.hasFocus())) return
       this.clipboardAuthorizationAttempted = true
       return this.syncLocalClipboard(true)
     },
 
     syncClipboardOnFocus() {
+      if (this.isStandaloneDesktop && !this.clipboardAuthorizationAttempted) {
+        return this.syncClipboardOnConnect()
+      }
       return this.syncLocalClipboard(false)
     },
 
@@ -469,7 +477,8 @@ export default {
       const focused = () => !this.disposed && this.directClipboard &&
         this.assetPermissions?.[PERMISSION_TYPE.PASTE] &&
         this.clientState === STATE_CONNECTED && document.hasFocus() &&
-        (requestPermission || this.$refs.onetermGuacamoleRef?.contains(document.activeElement))
+        (requestPermission || this.isStandaloneDesktop ||
+          this.$refs.onetermGuacamoleRef?.contains(document.activeElement))
       if (!focused()) return
       if (!window.isSecureContext || !navigator.clipboard?.readText) {
         if (requestPermission) this.warnClipboard('clipboardUnavailable')

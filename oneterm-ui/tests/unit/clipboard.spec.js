@@ -150,6 +150,80 @@ describe('direct text clipboard', () => {
     expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
   })
 
+  it('synchronizes an authorized standalone page before its input sink gains focus', async () => {
+    vm.isStandaloneDesktop = true
+    vm.clipboardAuthorizationAttempted = true
+    vm.$refs.onetermGuacamoleRef.contains = () => false
+    await vm.syncClipboardOnFocus()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(writer.sendText).toHaveBeenCalledWith('local text')
+    expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
+  })
+
+  it('uses page focus for the mounted standalone route', async () => {
+    const wrapper = shallowMount(GuacamoleClient, {
+      propsData: {
+        preferenceSetting: { settings: { directClipboard: true } },
+        assetPermissions: { copy: true, paste: true }
+      },
+      mocks: {
+        $route: { name: 'oneterm_desktop', query: {} },
+        $message: { warning: jest.fn(), destroy: jest.fn() },
+        $t: key => key
+      },
+      methods: { init: jest.fn() }
+    })
+    try {
+      wrapper.vm.client = { createClipboardStream: jest.fn(), disconnect: jest.fn() }
+      wrapper.vm.clientState = 3
+      wrapper.vm.clipboardAuthorizationAttempted = true
+      wrapper.vm.syncLocalClipboard = jest.fn(wrapper.vm.syncLocalClipboard.bind(wrapper.vm))
+      expect(wrapper.vm.$refs.onetermGuacamoleRef.contains(document.activeElement)).toBe(false)
+      window.dispatchEvent(new Event('focus'))
+      await wrapper.vm.syncLocalClipboard.mock.results[0].value
+      expect(writer.sendText).toHaveBeenCalledWith('local text')
+    } finally {
+      wrapper.destroy()
+    }
+  })
+
+  it('defers initial authorization until a background standalone page gains focus', async () => {
+    vm.isStandaloneDesktop = true
+    vm.$refs.onetermGuacamoleRef.contains = () => false
+    document.hasFocus.mockReturnValue(false)
+    await vm.syncClipboardOnConnect()
+    expect(vm.clipboardAuthorizationAttempted).toBe(false)
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+
+    document.hasFocus.mockReturnValue(true)
+    navigator.permissions.query.mockResolvedValue({ state: 'prompt' })
+    await vm.syncClipboardOnFocus()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    expect(vm.clipboardAuthorizationAttempted).toBe(true)
+    await vm.syncClipboardOnFocus()
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not synchronize a standalone page after the window loses focus during a read', async () => {
+    vm.isStandaloneDesktop = true
+    vm.clipboardAuthorizationAttempted = true
+    vm.$refs.onetermGuacamoleRef.contains = () => false
+    let resolveRead
+    let markReadStarted
+    const readStarted = new Promise(resolve => { markReadStarted = resolve })
+    navigator.clipboard.readText.mockImplementation(() => {
+      markReadStarted()
+      return new Promise(resolve => { resolveRead = resolve })
+    })
+    const pending = vm.syncClipboardOnFocus()
+    await readStarted
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+    document.hasFocus.mockReturnValue(false)
+    resolveRead('local text')
+    await pending
+    expect(vm.client.createClipboardStream).not.toHaveBeenCalled()
+  })
+
   it('requests initial authorization once per session, not on subsequent focus', async () => {
     navigator.permissions.query.mockResolvedValue({ state: 'prompt' })
     await vm.syncClipboardOnConnect()
@@ -328,6 +402,19 @@ describe('direct text clipboard', () => {
     vm.handleClipboardReceived({}, 'text/plain')
     reader.onend()
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('')
+  })
+
+  it('writes remote copies in a focused standalone page without input-sink focus', () => {
+    vm.isStandaloneDesktop = true
+    vm.$refs.onetermGuacamoleRef.contains = () => false
+    vm.handleClipboardReceived({}, 'text/plain')
+    reader.ontext('remote text')
+    reader.onend()
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('remote text')
+    navigator.clipboard.writeText.mockClear()
+    document.hasFocus.mockReturnValue(false)
+    reader.onend()
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled()
   })
 
   it('preserves legacy copy mode', () => {
