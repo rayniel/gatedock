@@ -497,7 +497,6 @@ const oneterm_zh = {
     clipboard: '剪贴板',
     clipboardUnavailable: '无法直接同步剪贴板。请使用 HTTPS（localhost 除外）、允许浏览器剪贴板权限，或使用手动剪贴板按钮。',
     clipboardFailed: '剪贴板同步失败，请检查浏览器权限或使用手动剪贴板按钮。',
-    clipboardContextFailed: '右键前同步本机剪贴板失败，远程粘贴可能使用旧内容。请检查浏览器权限，或使用 Ctrl+V、手动剪贴板。',
     clipboardPermissionDenied: '没有此会话的剪贴板权限'
   },
   systemSettings: {

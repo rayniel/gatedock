@@ -498,7 +498,6 @@ const oneterm_en = {
     clipboard: 'Clipboard',
     clipboardUnavailable: 'Direct clipboard sync is unavailable. Use HTTPS (except localhost), allow browser clipboard access, or use the manual clipboard button.',
     clipboardFailed: 'Clipboard sync failed. Check browser permissions or use the manual clipboard button.',
-    clipboardContextFailed: 'Clipboard sync before right-click failed; remote paste may use older content. Check browser permissions or use Ctrl+V or the manual clipboard.',
     clipboardPermissionDenied: 'Clipboard access is not allowed for this session'
   },
   systemSettings: {
