@@ -21,10 +21,9 @@ import (
 // RDP file operation functions
 
 // NewRDPProgressWriter creates a new RDP progress writer
-func NewRDPProgressWriter(writer io.Writer, transfer *guacd.FileTransfer, transferId string) *RDPProgressWriter {
+func NewRDPProgressWriter(writer io.Writer, transferId string) *RDPProgressWriter {
 	return &RDPProgressWriter{
 		writer:     writer,
-		transfer:   transfer,
 		transferId: transferId,
 		written:    0,
 	}
@@ -365,20 +364,9 @@ func UploadRDPFileStreamWithID(tunnel *guacd.Tunnel, transferID, sessionId, path
 		return fmt.Errorf("failed to get drive path: %w", err)
 	}
 
-	// Create transfer tracker
-	var transfer *guacd.FileTransfer
-	if transferID != "" {
-		transfer, err = guacd.DefaultFileTransferManager.CreateUploadWithID(transferID, sessionId, filepath.Base(path), drivePath)
-	} else {
-		transfer, err = guacd.DefaultFileTransferManager.CreateUpload(sessionId, filepath.Base(path), drivePath)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to create transfer tracker: %w", err)
-	}
-	// Note: Don't remove transfer immediately - let it be cleaned up later so progress can be queried
-
-	transfer.SetSize(totalSize)
+	// Progress is tracked by the unified transfer registry. The guacd transfer
+	// manager creates files from bare names at the drive root, so it must not be
+	// used for path-aware REST uploads.
 
 	// Validate and construct full filesystem path
 	fullPath, err := DefaultFileService.ValidateAndNormalizePath(drivePath, path)
@@ -397,7 +385,7 @@ func UploadRDPFileStreamWithID(tunnel *guacd.Tunnel, transferID, sessionId, path
 	}
 	defer destFile.Close()
 
-	progressWriter := NewRDPProgressWriter(destFile, transfer, transferID)
+	progressWriter := NewRDPProgressWriter(destFile, transferID)
 
 	buffer := make([]byte, 32*1024)
 	written, err := io.CopyBuffer(progressWriter, reader, buffer)

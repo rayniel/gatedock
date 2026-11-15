@@ -22,7 +22,6 @@ import (
 	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 
-	"github.com/veops/oneterm/internal/guacd"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	gsession "github.com/veops/oneterm/internal/session"
@@ -481,7 +480,6 @@ type RDPMkdirRequest struct {
 
 type RDPProgressWriter struct {
 	writer     io.Writer
-	transfer   *guacd.FileTransfer
 	transferId string
 	written    int64
 }
