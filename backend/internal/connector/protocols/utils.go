@@ -277,6 +277,21 @@ func Read(sess *gsession.Session) error {
 				}
 				switch t {
 				case websocket.TextMessage:
+					if sess.IsGuacd() {
+						var reply []byte
+						msg, reply, err = guacd.FilterTunnelInstructions(msg)
+						if err != nil {
+							return err
+						}
+						if len(reply) > 0 {
+							if err := sess.WriteWebsocket(websocket.TextMessage, reply); err != nil {
+								return err
+							}
+						}
+						if len(msg) == 0 {
+							continue
+						}
+					}
 					if handled, err := sess.HandleOutputAck(msg); handled {
 						if err != nil {
 							return err

@@ -76,6 +76,27 @@ func IsActive(p []byte) bool {
 	return active
 }
 
+// FilterTunnelInstructions keeps WebSocket-only instructions out of guacd.
+// Ping responses remain on the WebSocket side of the tunnel.
+func FilterTunnelInstructions(p []byte) (forward, reply []byte, err error) {
+	for len(p) > 0 {
+		opcode, size := instructionOpcode(p)
+		if size == 0 {
+			return nil, nil, fmt.Errorf("invalid Guacamole instruction")
+		}
+		instruction := p[:size]
+		if len(opcode) == 0 {
+			if bytes.HasPrefix(instruction, []byte("0.,4.ping,")) {
+				reply = append(reply, instruction...)
+			}
+		} else {
+			forward = append(forward, instruction...)
+		}
+		p = p[size:]
+	}
+	return forward, reply, nil
+}
+
 func instructionOpcode(p []byte) (opcode []byte, size int) {
 	for position := 0; position < len(p); {
 		length, digits := 0, 0
