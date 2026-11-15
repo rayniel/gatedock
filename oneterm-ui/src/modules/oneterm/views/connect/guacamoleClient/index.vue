@@ -95,6 +95,7 @@ export default {
       requestedSize: null,
       sessionId: '',
       clipboardWarningShown: false,
+      clipboardPastePending: false,
       disposed: false,
       keyboard: null,
     }
@@ -218,8 +219,10 @@ export default {
           client.sendKeyEvent(1, 65507)
           return true
         }
-        // Let the browser supply paste text before forwarding the remote shortcut.
-        if (this.isBrowserPasteKey(keysym, keyboard.pressed)) return true
+        if (this.isDirectPasteShortcut(keysym, keyboard.pressed)) {
+          this.handleDirectPasteFromClipboard(keyboard.pressed)
+          return false
+        }
         client.sendKeyEvent(1, keysym)
         if (keysym === 65288) {
           return false
@@ -424,20 +427,47 @@ export default {
         return
       }
       if (this.handleClipboardOk(event.clipboardData.getData('text/plain'))) {
-        // Clipboard instructions and the shortcut share the same ordered tunnel.
-        const pressed = this.keyboard?.pressed || {}
-        const control = pressed[65507] || pressed[65508] ||
-          META_KEYS.some(key => pressed[key])
-        const shift = pressed[65505] || pressed[65506]
-        const key = shift && !control ? 65379 : 118
-        if (!control && !shift) this.client.sendKeyEvent(1, 65507)
-        this.client.sendKeyEvent(1, key)
-        this.client.sendKeyEvent(0, key)
-        if (!control && !shift) this.client.sendKeyEvent(0, 65507)
+        this.sendPasteShortcut(this.keyboard?.pressed || {})
       }
     },
 
-    isBrowserPasteKey(keysym, pressed) {
+    handleDirectPasteFromClipboard(pressed) {
+      if (!this.directClipboard || this.clientState !== STATE_CONNECTED) return
+      if (!this.assetPermissions?.[PERMISSION_TYPE.PASTE]) {
+        this.$message.warning(this.$t('oneterm.guacamole.clipboardPermissionDenied'))
+        return
+      }
+      if (!window.isSecureContext || !navigator.clipboard?.readText) {
+        this.warnClipboard('clipboardUnavailable')
+        return
+      }
+      if (this.clipboardPastePending) return
+
+      this.clipboardPastePending = true
+      navigator.clipboard.readText()
+        .then(content => {
+          if (!this.disposed && this.handleClipboardOk(content)) {
+            this.sendPasteShortcut(pressed)
+          }
+        })
+        .catch(() => this.warnClipboard('clipboardFailed'))
+        .finally(() => {
+          this.clipboardPastePending = false
+        })
+    },
+
+    sendPasteShortcut(pressed) {
+      const control = pressed[65507] || pressed[65508] ||
+        META_KEYS.some(key => pressed[key])
+      const shift = pressed[65505] || pressed[65506]
+      const key = shift && !control ? 65379 : 118
+      if (!control && !shift) this.client.sendKeyEvent(1, 65507)
+      this.client.sendKeyEvent(1, key)
+      this.client.sendKeyEvent(0, key)
+      if (!control && !shift) this.client.sendKeyEvent(0, 65507)
+    },
+
+    isDirectPasteShortcut(keysym, pressed) {
       if (!this.directClipboard) return false
       const modifier = pressed[65507] || pressed[65508] || META_KEYS.some(key => pressed[key])
       return ((keysym === 118 || keysym === 86) && Boolean(modifier)) ||

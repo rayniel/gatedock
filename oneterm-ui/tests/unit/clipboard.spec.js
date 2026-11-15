@@ -31,7 +31,11 @@ describe('direct text clipboard', () => {
     Guacamole.StringReader.mockImplementation(() => reader)
     Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
     Object.defineProperty(navigator, 'clipboard', {
-      configurable: true, value: { writeText: jest.fn().mockResolvedValue() }
+      configurable: true,
+      value: {
+        readText: jest.fn().mockResolvedValue('local text'),
+        writeText: jest.fn().mockResolvedValue()
+      }
     })
     vm = {
       ...GuacamoleClient.data(),
@@ -85,16 +89,56 @@ describe('direct text clipboard', () => {
     expect(vm.client.sendKeyEvent.mock.calls).toEqual([[1, 118], [0, 118]])
   })
 
-  it('preserves Shift+Insert and lets Ctrl/Cmd+V reach the browser', () => {
+  it('recognizes Ctrl/Cmd+V and Shift+Insert as direct-paste shortcuts', () => {
     vm.keyboard = { pressed: { 65505: true } }
     vm.handleDirectPaste(paste)
     expect(vm.client.sendKeyEvent.mock.calls).toEqual([[1, 65379], [0, 65379]])
-    expect(vm.isBrowserPasteKey(118, { 65507: true })).toBe(true)
-    expect(vm.isBrowserPasteKey(118, { 65515: true })).toBe(true)
-    expect(vm.isBrowserPasteKey(65379, { 65505: true })).toBe(true)
-    expect(vm.isBrowserPasteKey(118, {})).toBe(false)
+    expect(vm.isDirectPasteShortcut(118, { 65507: true })).toBe(true)
+    expect(vm.isDirectPasteShortcut(118, { 65515: true })).toBe(true)
+    expect(vm.isDirectPasteShortcut(65379, { 65505: true })).toBe(true)
+    expect(vm.isDirectPasteShortcut(118, {})).toBe(false)
     vm.directClipboard = false
-    expect(vm.isBrowserPasteKey(118, { 65507: true })).toBe(false)
+    expect(vm.isDirectPasteShortcut(118, { 65507: true })).toBe(false)
+  })
+
+  it('reads the local clipboard on the shortcut gesture and sends text before remote paste', async () => {
+    vm.handleDirectPasteFromClipboard({ 65507: true, 118: true })
+    expect(navigator.clipboard.readText).toHaveBeenCalled()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(writer.sendText).toHaveBeenCalledWith('local text')
+    expect(writer.sendEnd.mock.invocationCallOrder[0]).toBeLessThan(vm.client.sendKeyEvent.mock.invocationCallOrder[0])
+    expect(vm.client.sendKeyEvent.mock.calls).toEqual([[1, 118], [0, 118]])
+    expect(vm.clipboardPastePending).toBe(false)
+  })
+
+  it('does not send the remote shortcut when clipboard reading fails or access is denied', async () => {
+    navigator.clipboard.readText.mockRejectedValue(new Error('permission denied'))
+    vm.handleDirectPasteFromClipboard({ 65507: true, 118: true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(vm.client.createClipboardStream).not.toHaveBeenCalled()
+    expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
+    expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardFailed')
+
+    vm.$message.warning.mockClear()
+    vm.assetPermissions.paste = false
+    vm.handleDirectPasteFromClipboard({ 65507: true, 118: true })
+    expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardPermissionDenied')
+    expect(navigator.clipboard.readText).toHaveBeenCalledTimes(1)
+  })
+
+  it('requires a secure context and clipboard read support for keyboard paste', () => {
+    vm.directClipboard = false
+    vm.handleDirectPasteFromClipboard({ 65507: true, 118: true })
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+    vm.directClipboard = true
+    Object.defineProperty(window, 'isSecureContext', { value: false })
+    vm.handleDirectPasteFromClipboard({ 65507: true, 118: true })
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+    expect(vm.client.sendKeyEvent).not.toHaveBeenCalled()
+    expect(vm.$message.warning).toHaveBeenCalledWith('oneterm.guacamole.clipboardUnavailable')
   })
 
   it('does not intercept paste when disabled or disconnected', () => {
